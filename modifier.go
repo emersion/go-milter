@@ -62,6 +62,34 @@ func (m *Modifier) ChangeHeader(index int, name, value string) error {
 	return m.writePacket(NewResponse('m', buffer.Bytes()).Response())
 }
 
+// InsertHeader inserts the header at the specified position
+func (m *Modifier) InsertHeader(index int, name, value string) error {
+	buffer := new(bytes.Buffer)
+	// encode header index in the beginning
+	if err := binary.Write(buffer, binary.BigEndian, uint32(index)); err != nil {
+		return err
+	}
+	// add header name and value to buffer
+	data := []byte(name + null + value + null)
+	if _, err := buffer.Write(data); err != nil {
+		return err
+	}
+	// prepare and send response packet
+	return m.writePacket(NewResponse('i', buffer.Bytes()).Response())
+}
+
+// ChangeFrom replaces the FROM envelope header with a new one
+func (m *Modifier) ChangeFrom(value string) error {
+	buffer := new(bytes.Buffer)
+	// add header name and value to buffer
+	data := []byte(value + null)
+	if _, err := buffer.Write(data); err != nil {
+		return err
+	}
+	// prepare and send response packet
+	return m.writePacket(NewResponse('e', buffer.Bytes()).Response())
+}
+
 // newModifier creates a new Modifier instance from milterSession
 func newModifier(s *milterSession) *Modifier {
 	return &Modifier{

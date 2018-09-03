@@ -27,6 +27,7 @@ const (
 	OptRemoveRcpt   OptAction = 0x08
 	OptChangeHeader OptAction = 0x10
 	OptQuarantine   OptAction = 0x20
+	OptChangeFrom   OptAction = 0x40
 
 	// mask out unwanted parts of the SMTP transaction
 	OptNoConnect  OptProtocol = 0x01
