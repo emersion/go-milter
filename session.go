@@ -46,12 +46,12 @@ const (
 
 // milterSession keeps session state during MTA communication
 type milterSession struct {
-	actions   OptAction
+	actions  OptAction
 	protocol OptProtocol
-	conn      net.Conn
-	headers   textproto.MIMEHeader
-	macros    map[string]string
-	backend   Milter
+	conn     net.Conn
+	headers  textproto.MIMEHeader
+	macros   map[string]string
+	backend  Milter
 }
 
 // ReadPacket reads incoming milter packet
