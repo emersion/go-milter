@@ -1,31 +1,31 @@
-// A Go library for milter support
 package milter
 
 import (
 	"net"
 )
 
-// MilterInit initializes milter options
-// multiple options can be set using a bitmask
-type MilterInit func() (Milter, OptAction, OptProtocol)
+// Server is a milter server.
+type Server struct {
+	Backend   Backend
+	Actions   OptAction
+	Protocols OptProtocol
+}
 
-// RunServer provides a convenient way to start a milter server
-func RunServer(server net.Listener, init MilterInit) error {
+// Serve starts the server.
+func (s *Server) Serve(l net.Listener) error {
+	defer l.Close()
+
 	for {
-		// accept connection from client
-		client, err := server.Accept()
+		conn, err := l.Accept()
 		if err != nil {
 			return err
 		}
-		// create milter object
-		milter, actions, protocol := init()
 		session := milterSession{
-			actions:  actions,
-			protocol: protocol,
-			sock:     client,
-			milter:   milter,
+			actions:   s.Actions,
+			protocols: s.Protocols,
+			conn:      conn,
+			backend:   s.Backend,
 		}
-		// handle connection commands
 		go session.HandleMilterCommands()
 	}
 }

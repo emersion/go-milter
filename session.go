@@ -46,25 +46,25 @@ const (
 
 // milterSession keeps session state during MTA communication
 type milterSession struct {
-	actions  OptAction
-	protocol OptProtocol
-	sock     io.ReadWriteCloser
-	headers  textproto.MIMEHeader
-	macros   map[string]string
-	milter   Milter
+	actions   OptAction
+	protocols OptProtocol
+	conn      net.Conn
+	headers   textproto.MIMEHeader
+	macros    map[string]string
+	backend   Backend
 }
 
 // ReadPacket reads incoming milter packet
 func (c *milterSession) ReadPacket() (*Message, error) {
 	// read packet length
 	var length uint32
-	if err := binary.Read(c.sock, binary.BigEndian, &length); err != nil {
+	if err := binary.Read(c.conn, binary.BigEndian, &length); err != nil {
 		return nil, err
 	}
 
 	// read packet data
 	data := make([]byte, length)
-	if _, err := io.ReadFull(c.sock, data); err != nil {
+	if _, err := io.ReadFull(c.conn, data); err != nil {
 		return nil, err
 	}
 
@@ -79,7 +79,7 @@ func (c *milterSession) ReadPacket() (*Message, error) {
 
 // WritePacket sends a milter response packet to socket stream
 func (m *milterSession) WritePacket(msg *Message) error {
-	buffer := bufio.NewWriter(m.sock)
+	buffer := bufio.NewWriter(m.conn)
 
 	// calculate and write response length
 	length := uint32(len(msg.Data) + 1)
@@ -117,7 +117,7 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 
 	case 'B':
 		// body chunk
-		return m.milter.BodyChunk(msg.Data, newModifier(m))
+		return m.backend.BodyChunk(msg.Data, newModifier(m))
 
 	case 'C':
 		// new connection, get hostname
@@ -145,7 +145,7 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 			'6': "tcp6",
 		}
 		// run handler and return
-		return m.milter.Connect(
+		return m.backend.Connect(
 			Hostname,
 			family[protocolFamily],
 			Port,
@@ -168,12 +168,12 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 
 	case 'E':
 		// call and return milter handler
-		return m.milter.Body(newModifier(m))
+		return m.backend.Body(newModifier(m))
 
 	case 'H':
 		// helo command
 		name := strings.TrimSuffix(string(msg.Data), null)
-		return m.milter.Helo(name, newModifier(m))
+		return m.backend.Helo(name, newModifier(m))
 
 	case 'L':
 		// make sure headers is initialized
@@ -185,23 +185,23 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 		if len(HeaderData) == 2 {
 			m.headers.Add(HeaderData[0], HeaderData[1])
 			// call and return milter handler
-			return m.milter.Header(HeaderData[0], HeaderData[1], newModifier(m))
+			return m.backend.Header(HeaderData[0], HeaderData[1], newModifier(m))
 		}
 
 	case 'M':
 		// envelope from address
 		envfrom := readCString(msg.Data)
-		return m.milter.MailFrom(strings.Trim(envfrom, "<>"), newModifier(m))
+		return m.backend.MailFrom(strings.Trim(envfrom, "<>"), newModifier(m))
 
 	case 'N':
 		// end of headers
-		return m.milter.Headers(m.headers, newModifier(m))
+		return m.backend.Headers(m.headers, newModifier(m))
 
 	case 'O':
 		// ignore request and prepare response buffer
 		buffer := new(bytes.Buffer)
 		// prepare response data
-		for _, value := range []uint32{2, uint32(m.actions), uint32(m.protocol)} {
+		for _, value := range []uint32{2, uint32(m.actions), uint32(m.protocols)} {
 			if err := binary.Write(buffer, binary.BigEndian, value); err != nil {
 				return nil, err
 			}
@@ -216,7 +216,7 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 	case 'R':
 		// envelope to address
 		envto := readCString(msg.Data)
-		return m.milter.RcptTo(strings.Trim(envto, "<>"), newModifier(m))
+		return m.backend.RcptTo(strings.Trim(envto, "<>"), newModifier(m))
 
 	case 'T':
 		// data, ignore
@@ -234,7 +234,7 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 // HandleMilterComands processes all milter commands in the same connection
 func (m *milterSession) HandleMilterCommands() {
 	// close session socket on exit
-	defer m.sock.Close()
+	defer m.conn.Close()
 
 	for {
 		// ReadPacket

@@ -6,8 +6,8 @@ import (
 	"net/textproto"
 )
 
-// Milter is an interface for milter callback handlers
-type Milter interface {
+// Backend is an interface for milter callback handlers
+type Backend interface {
 	// Connect is called to provide SMTP connection data for incoming message
 	//   supress with NoConnect
 	Connect(host string, family string, port uint16, addr net.IP, m *Modifier) (Response, error)
