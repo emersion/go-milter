@@ -1,3 +1,4 @@
+// Package milter provides an interface to implement milter mail filters
 package milter
 
 import (

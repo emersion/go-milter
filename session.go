@@ -4,12 +4,15 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"io"
 	"log"
 	"net"
 	"net/textproto"
 	"strings"
 )
+
+var errCloseSession = errors.New("Stop current milter processing")
 
 // OptAction sets which actions the milter wants to perform.
 // Multiple options can be set using a bitmask.
