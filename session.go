@@ -15,12 +15,8 @@ import (
 // Multiple options can be set using a bitmask.
 type OptAction uint32
 
-// OptProtocol masks out unwanted parts of the SMTP transaction.
-// Multiple options can be set using a bitmask.
-type OptProtocol uint32
-
+// set which actions the milter wants to perform
 const (
-	// set which actions the milter wants to perform
 	OptAddHeader    OptAction = 0x01
 	OptChangeBody   OptAction = 0x02
 	OptAddRcpt      OptAction = 0x04
@@ -28,8 +24,14 @@ const (
 	OptChangeHeader OptAction = 0x10
 	OptQuarantine   OptAction = 0x20
 	OptChangeFrom   OptAction = 0x40
+)
 
-	// mask out unwanted parts of the SMTP transaction
+// OptProtocol masks out unwanted parts of the SMTP transaction.
+// Multiple options can be set using a bitmask.
+type OptProtocol uint32
+
+// mask out unwanted parts of the SMTP transaction
+const (
 	OptNoConnect  OptProtocol = 0x01
 	OptNoHelo     OptProtocol = 0x02
 	OptNoMailFrom OptProtocol = 0x04
