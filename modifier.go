@@ -46,7 +46,8 @@ func (m *Modifier) Quarantine(reason string) error {
 	return m.writePacket(NewResponse('q', []byte(reason+null)).Response())
 }
 
-// ChangeHeader replaces the header at the specified position with a new one
+// ChangeHeader replaces the header at the specified position with a new one.
+// The index is per name.
 func (m *Modifier) ChangeHeader(index int, name, value string) error {
 	buffer := new(bytes.Buffer)
 	// encode header index in the beginning
