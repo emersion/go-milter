@@ -8,7 +8,7 @@ import (
 type Server struct {
 	Backend   Backend
 	Actions   OptAction
-	Protocols OptProtocol
+	Protocol OptProtocol
 }
 
 // Serve starts the server.
@@ -22,7 +22,7 @@ func (s *Server) Serve(l net.Listener) error {
 		}
 		session := milterSession{
 			actions:   s.Actions,
-			protocols: s.Protocols,
+			protocol: s.Protocol,
 			conn:      conn,
 			backend:   s.Backend,
 		}

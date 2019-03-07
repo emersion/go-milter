@@ -47,7 +47,7 @@ const (
 // milterSession keeps session state during MTA communication
 type milterSession struct {
 	actions   OptAction
-	protocols OptProtocol
+	protocol OptProtocol
 	conn      net.Conn
 	headers   textproto.MIMEHeader
 	macros    map[string]string
@@ -201,7 +201,7 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 		// ignore request and prepare response buffer
 		buffer := new(bytes.Buffer)
 		// prepare response data
-		for _, value := range []uint32{2, uint32(m.actions), uint32(m.protocols)} {
+		for _, value := range []uint32{2, uint32(m.actions), uint32(m.protocol)} {
 			if err := binary.Write(buffer, binary.BigEndian, value); err != nil {
 				return nil, err
 			}
