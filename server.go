@@ -6,8 +6,8 @@ import (
 
 // Server is a milter server.
 type Server struct {
-	Backend   Backend
-	Actions   OptAction
+	NewMilter func() Milter
+	Actions OptAction
 	Protocol OptProtocol
 }
 
@@ -20,11 +20,12 @@ func (s *Server) Serve(l net.Listener) error {
 		if err != nil {
 			return err
 		}
+
 		session := milterSession{
 			actions:   s.Actions,
-			protocol: s.Protocol,
+			protocol:  s.Protocol,
 			conn:      conn,
-			backend:   s.Backend,
+			backend:   s.NewMilter(),
 		}
 		go session.HandleMilterCommands()
 	}

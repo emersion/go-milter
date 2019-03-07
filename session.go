@@ -51,7 +51,7 @@ type milterSession struct {
 	conn      net.Conn
 	headers   textproto.MIMEHeader
 	macros    map[string]string
-	backend   Backend
+	backend   Milter
 }
 
 // ReadPacket reads incoming milter packet
