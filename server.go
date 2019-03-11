@@ -1,23 +1,36 @@
 package milter
 
 import (
+	"errors"
 	"net"
 )
+
+// ErrServerClosed is returned by the Server's Serve method after a call to
+// Close.
+var ErrServerClosed = errors.New("milter: server closed")
 
 // Server is a milter server.
 type Server struct {
 	NewMilter func() Milter
 	Actions   OptAction
 	Protocol  OptProtocol
+
+	listeners []net.Listener
+	closed    bool
 }
 
 // Serve starts the server.
-func (s *Server) Serve(l net.Listener) error {
-	defer l.Close()
+func (s *Server) Serve(ln net.Listener) error {
+	defer ln.Close()
+
+	s.listeners = append(s.listeners, ln)
 
 	for {
-		conn, err := l.Accept()
+		conn, err := ln.Accept()
 		if err != nil {
+			if s.closed {
+				return ErrServerClosed
+			}
 			return err
 		}
 
@@ -29,4 +42,14 @@ func (s *Server) Serve(l net.Listener) error {
 		}
 		go session.HandleMilterCommands()
 	}
+}
+
+func (s *Server) Close() error {
+	s.closed = true
+	for _, ln := range s.listeners {
+		if err := ln.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
