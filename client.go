@@ -63,11 +63,11 @@ func (s *ClientSession) negotiate(actionMask OptAction, protoMask OptProtocol) e
 	// denomiator as the effective mask.
 	msg := &Message{
 		Code: byte(CodeOptNeg), // TODO(foxcpp): Get rid of casts by changing msg.Code to have Code type
-		Data: make([]byte, 4),
+		Data: make([]byte, 4*3),
 	}
-	binary.BigEndian.PutUint16(msg.Data, protocolVersion)
-	binary.BigEndian.PutUint32(msg.Data, uint32(actionMask))
-	binary.BigEndian.PutUint32(msg.Data, uint32(protoMask))
+	binary.BigEndian.PutUint32(msg.Data, protocolVersion)
+	binary.BigEndian.PutUint32(msg.Data[4:], uint32(actionMask))
+	binary.BigEndian.PutUint32(msg.Data[8:], uint32(protoMask))
 
 	if err := writePacket(s.conn, msg); err != nil {
 		return fmt.Errorf("milter: negotiate: optneg write: %w", err)
@@ -79,18 +79,18 @@ func (s *ClientSession) negotiate(actionMask OptAction, protoMask OptProtocol) e
 	if Code(msg.Code) != CodeOptNeg {
 		return fmt.Errorf("milter: negotiate: unexpected code: %v", rune(msg.Code))
 	}
-	if len(msg.Data) != 2+4+4 /* version + action mask + proto mask */ {
+	if len(msg.Data) != 4*3 /* version + action mask + proto mask */ {
 		return fmt.Errorf("milter: negotiate: unexpected data size: %v", len(msg.Data))
 	}
-	milterVersion := binary.BigEndian.Uint16(msg.Data[:2])
+	milterVersion := binary.BigEndian.Uint32(msg.Data[:4])
 	if milterVersion != protocolVersion {
 		return fmt.Errorf("milter: negotiate: unsupported protocol version: %v", milterVersion)
 	}
 
 	// AND it with our mask in case milter does not do that.
-	milterActionMask := binary.BigEndian.Uint32(msg.Data[6:10])
+	milterActionMask := binary.BigEndian.Uint32(msg.Data[4:])
 	s.actionMask = actionMask & OptAction(milterActionMask)
-	milterProtoMask := binary.BigEndian.Uint32(msg.Data[2:6])
+	milterProtoMask := binary.BigEndian.Uint32(msg.Data[8:])
 	s.protoMask = protoMask & OptProtocol(milterProtoMask)
 
 	return nil
