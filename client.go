@@ -384,6 +384,8 @@ const (
 	ActReplBody     ModifyActCode = 'b'
 	ActAddHeader    ModifyActCode = 'h'
 	ActChangeHeader ModifyActCode = 'm'
+	ActInsertHeader ModifyActCode = 'i'
+	ActChangeFrom   ModifyActCode = 'e'
 )
 
 type ModifyAction struct {
@@ -392,21 +394,28 @@ type ModifyAction struct {
 	// Recipient to add/remove if Code == ActAddRcpt or ActDelRcpt.
 	Rcpt string
 
+	// New envelope sender if Code = ActChangeFrom.
+	From string
+
+	// ESMTP arguments for envelope sender if Code = ActChangeFrom.
+	FromArgs []string
+
 	// Portion of body to be replaced if Code == ActReplBody.
 	Body []byte
 
-	// Index of the header field to be changed if Code = ActChangeHeader.
+	// Index of the header field to be changed if Code = ActChangeHeader or Code = ActInsertHeader.
 	// Index is 1-based and is per value of HdrName.
 	// E.g. HdrIndex = 3 and HdrName = "DKIM-Signature" mean "change third
 	// DKIM-Signature field". Order is the same as of HeaderField calls.
 	HdrIndex uint32
 
 	// Header field name to be added/changed if Code == ActAddHeader or
-	// ActChangeHeader.
+	// ActChangeHeader or ActInsertHeader.
 	HdrName string
 
 	// Header field value to be added/changed if Code == ActAddHeader or
-	// ActChangeHeader. If set to empty string - the field should be removed.
+	// ActChangeHeader or ActInsertHeader. If set to empty string - the field
+	// should be removed.
 	HdrValue string
 }
 
@@ -420,7 +429,13 @@ func parseModifyAct(msg *Message) (*ModifyAction, error) {
 		act.Rcpt = readCString(msg.Data)
 	case ActReplBody:
 		act.Body = msg.Data
-	case ActChangeHeader:
+	case ActChangeFrom:
+		argv := bytes.Split(msg.Data, []byte{0x00})
+		act.From = string(argv[0])
+		for _, arg := range argv[1:] {
+			act.FromArgs = append(act.FromArgs, string(arg))
+		}
+	case ActChangeHeader, ActInsertHeader:
 		if len(msg.Data) < 4 {
 			return nil, fmt.Errorf("read modify action: missing header index")
 		}
@@ -457,7 +472,7 @@ func (s *ClientSession) readModifyActs() (modifyActs []ModifyAction, act *Action
 		}
 
 		switch ModifyActCode(msg.Code) {
-		case ActAddRcpt, ActDelRcpt, ActReplBody, ActAddHeader, ActChangeHeader:
+		case ActAddRcpt, ActDelRcpt, ActReplBody, ActChangeHeader, ActInsertHeader, ActAddHeader, ActChangeFrom:
 			modifyAct, err := parseModifyAct(msg)
 			if err != nil {
 				return nil, nil, err
