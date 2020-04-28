@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
+
+	"github.com/emersion/go-message/textproto"
 )
 
 type Client struct {
@@ -304,7 +307,6 @@ func (s *ClientSession) HeaderField(key, value string) (*Action, error) {
 	msg := &Message{
 		Code: byte(CodeHeader),
 	}
-
 	msg.Data = appendCString(msg.Data, key)
 	msg.Data = appendCString(msg.Data, value)
 
@@ -319,9 +321,6 @@ func (s *ClientSession) HeaderField(key, value string) (*Action, error) {
 	return act, nil
 }
 
-// TODO(foxcpp): Provide helper to send all header fields from section.
-// https://github.com/emersion/go-milter/issues/2
-
 // HeaderEnd send the EOH (End-Of-Header) message to the milter.
 //
 // No HeaderField calls are allowed after this point.
@@ -330,11 +329,9 @@ func (s *ClientSession) HeaderEnd() (*Action, error) {
 		return &Action{Code: ActContinue}, nil
 	}
 
-	msg := &Message{
+	if err := writePacket(s.conn, &Message{
 		Code: byte(CodeEOH),
-	}
-
-	if err := writePacket(s.conn, msg); err != nil {
+	}); err != nil {
 		return nil, fmt.Errorf("milter: header end: %w", err)
 	}
 
@@ -345,8 +342,20 @@ func (s *ClientSession) HeaderEnd() (*Action, error) {
 	return act, nil
 }
 
-// TODO(foxcpp): Provide helper to send entire body.
-// https://github.com/emersion/go-milter/issues/4 (?)
+// Header sends each field from textproto.Header followed by EOH unless
+// header messages are disabled during negotiation.
+func (s *ClientSession) Header(hdr textproto.Header) (*Action, error) {
+	for f := hdr.Fields(); f.Next(); {
+		act, err := s.HeaderField(f.Key(), f.Value())
+		if err != nil {
+			return nil, err
+		}
+		if act.Code != ActContinue {
+			return act, nil
+		}
+	}
+	return s.HeaderEnd()
+}
 
 // BodyChunk sends a single body chunk to the milter.
 //
@@ -374,6 +383,39 @@ func (s *ClientSession) BodyChunk(chunk []byte) (*Action, error) {
 		return nil, fmt.Errorf("milter: body chunk: %w", err)
 	}
 	return act, nil
+}
+
+// Body is a helper function that calls BodyChunk repeately to transmit entire
+// body from io.Reader and then calls End.
+//
+// See documentation for these functions for details.
+func (s *ClientSession) Body(r io.Reader) ([]ModifyAction, *Action, error) {
+	// It is problematic to use io.WriteCloser since we may need to report
+	// action after each write.
+
+	buf := make([]byte, MaxBodyChunk)
+	for {
+		n, err := r.Read(buf)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, nil, err
+		}
+		if n == 0 {
+			break
+		}
+
+		act, err := s.BodyChunk(buf[:n])
+		if err != nil {
+			return nil, nil, err
+		}
+		if act.Code != ActContinue {
+			return nil, act, nil
+		}
+	}
+
+	return s.End()
 }
 
 type ModifyActCode byte
