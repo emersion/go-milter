@@ -7,10 +7,14 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"time"
 
 	"github.com/emersion/go-message/textproto"
 )
 
+// Client is a wrapper for managing milter connections.
+//
+// Currently it just creates new connections using provided Dialer.
 type Client struct {
 	// Dialer is used to establish new connections to the milter.
 	// Set to empty net.Dialer{} by NewClient.
@@ -18,24 +22,39 @@ type Client struct {
 		Dial(network string, addr string) (net.Conn, error)
 	}
 
-	network string
-	address string
+	ReadTimeout  time.Duration
+	WriteTimeout time.Duration
+
+	Network string
+	Address string
 }
 
+// NewClient creates a new Client instance populating fields with default
+// values.
+//
+// Dialer is net.Dialer with 10 second timeout, Read and Write timeouts are set
+// to 10 seconds too.
 func NewClient(network, address string) *Client {
 	return &Client{
-		Dialer:  &net.Dialer{},
-		network: network,
-		address: address,
+		Dialer: &net.Dialer{
+			Timeout: 10 * time.Second,
+		},
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		Network:      network,
+		Address:      address,
 	}
 }
 
 func (c *Client) Session(actionMask OptAction, protoMask OptProtocol) (*ClientSession, error) {
-	s := &ClientSession{}
+	s := &ClientSession{
+		readTimeout:  c.ReadTimeout,
+		writeTimeout: c.WriteTimeout,
+	}
 
 	// TODO(foxcpp): Connection pooling.
 
-	conn, err := c.Dialer.Dial(c.network, c.address)
+	conn, err := c.Dialer.Dial(c.Network, c.Address)
 	if err != nil {
 		return nil, fmt.Errorf("milter: session create: %w", err)
 	}
@@ -57,6 +76,9 @@ type ClientSession struct {
 	conn       net.Conn
 	actionMask OptAction
 	protoMask  OptProtocol
+
+	readTimeout  time.Duration
+	writeTimeout time.Duration
 }
 
 // negotiate exchanges OPTNEG messages with the milter and sets s.mask to the
@@ -72,10 +94,10 @@ func (s *ClientSession) negotiate(actionMask OptAction, protoMask OptProtocol) e
 	binary.BigEndian.PutUint32(msg.Data[4:], uint32(actionMask))
 	binary.BigEndian.PutUint32(msg.Data[8:], uint32(protoMask))
 
-	if err := writePacket(s.conn, msg); err != nil {
+	if err := writePacket(s.conn, msg, s.writeTimeout); err != nil {
 		return fmt.Errorf("milter: negotiate: optneg write: %w", err)
 	}
-	msg, err := readPacket(s.conn)
+	msg, err := readPacket(s.conn, s.readTimeout)
 	if err != nil {
 		return fmt.Errorf("milter: negotiate: optneg read: %w", err)
 	}
@@ -111,7 +133,7 @@ func (s *ClientSession) Macros(code Code, kv ...string) error {
 		msg.Data = appendCString(msg.Data, str)
 	}
 
-	if err := writePacket(s.conn, msg); err != nil {
+	if err := writePacket(s.conn, msg, s.writeTimeout); err != nil {
 		return fmt.Errorf("milter: macros: %w", err)
 	}
 
@@ -150,7 +172,7 @@ type Action struct {
 
 func (s *ClientSession) readAction() (*Action, error) {
 	for {
-		msg, err := readPacket(s.conn)
+		msg, err := readPacket(s.conn, s.readTimeout)
 		if err != nil {
 			return nil, fmt.Errorf("action read: %w", err)
 		}
@@ -209,7 +231,7 @@ func (s *ClientSession) Conn(hostname string, family ProtoFamily, port uint16, a
 		msg.Data = appendCString(msg.Data, addr)
 	}
 
-	if err := writePacket(s.conn, msg); err != nil {
+	if err := writePacket(s.conn, msg, s.writeTimeout); err != nil {
 		return nil, fmt.Errorf("milter: conn: %w", err)
 	}
 
@@ -235,7 +257,7 @@ func (s *ClientSession) Helo(helo string) (*Action, error) {
 		Data: appendCString(nil, helo),
 	}
 
-	if err := writePacket(s.conn, msg); err != nil {
+	if err := writePacket(s.conn, msg, s.writeTimeout); err != nil {
 		return nil, fmt.Errorf("milter: helo: %w", err)
 	}
 
@@ -260,7 +282,7 @@ func (s *ClientSession) Mail(sender string, esmtpArgs []string) (*Action, error)
 		msg.Data = appendCString(msg.Data, arg)
 	}
 
-	if err := writePacket(s.conn, msg); err != nil {
+	if err := writePacket(s.conn, msg, s.writeTimeout); err != nil {
 		return nil, fmt.Errorf("milter: mail: %w", err)
 	}
 
@@ -285,7 +307,7 @@ func (s *ClientSession) Rcpt(rcpt string, esmtpArgs []string) (*Action, error) {
 		msg.Data = appendCString(msg.Data, arg)
 	}
 
-	if err := writePacket(s.conn, msg); err != nil {
+	if err := writePacket(s.conn, msg, s.writeTimeout); err != nil {
 		return nil, fmt.Errorf("milter: rcpt: %w", err)
 	}
 
@@ -310,7 +332,7 @@ func (s *ClientSession) HeaderField(key, value string) (*Action, error) {
 	msg.Data = appendCString(msg.Data, key)
 	msg.Data = appendCString(msg.Data, value)
 
-	if err := writePacket(s.conn, msg); err != nil {
+	if err := writePacket(s.conn, msg, s.writeTimeout); err != nil {
 		return nil, fmt.Errorf("milter: header field: %w", err)
 	}
 
@@ -331,7 +353,7 @@ func (s *ClientSession) HeaderEnd() (*Action, error) {
 
 	if err := writePacket(s.conn, &Message{
 		Code: byte(CodeEOH),
-	}); err != nil {
+	}, s.writeTimeout); err != nil {
 		return nil, fmt.Errorf("milter: header end: %w", err)
 	}
 
@@ -374,7 +396,7 @@ func (s *ClientSession) BodyChunk(chunk []byte) (*Action, error) {
 	if err := writePacket(s.conn, &Message{
 		Code: byte(CodeBody),
 		Data: chunk,
-	}); err != nil {
+	}, s.writeTimeout); err != nil {
 		return nil, fmt.Errorf("milter: body chunk: %w", err)
 	}
 
@@ -505,7 +527,7 @@ func parseModifyAct(msg *Message) (*ModifyAction, error) {
 
 func (s *ClientSession) readModifyActs() (modifyActs []ModifyAction, act *Action, err error) {
 	for {
-		msg, err := readPacket(s.conn)
+		msg, err := readPacket(s.conn, s.readTimeout)
 		if err != nil {
 			return nil, nil, fmt.Errorf("action read: %w", err)
 		}
@@ -539,7 +561,7 @@ func (s *ClientSession) readModifyActs() (modifyActs []ModifyAction, act *Action
 func (s *ClientSession) End() ([]ModifyAction, *Action, error) {
 	if err := writePacket(s.conn, &Message{
 		Code: byte(CodeEOB),
-	}); err != nil {
+	}, s.writeTimeout); err != nil {
 		return nil, nil, fmt.Errorf("milter: end: %w", err)
 	}
 
@@ -557,7 +579,7 @@ func (s *ClientSession) Close() error {
 
 	if err := writePacket(s.conn, &Message{
 		Code: byte(CodeQuit),
-	}); err != nil {
+	}, s.writeTimeout); err != nil {
 		return fmt.Errorf("milter: close: %w", err)
 	}
 	return s.Close()
