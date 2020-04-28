@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"flag"
-	"io"
 	"log"
 	"os"
 	"strings"
@@ -126,54 +125,17 @@ func main() {
 		return
 	}
 
-	for f := hdr.Fields(); f.Next(); {
-		act, err = s.HeaderField(f.Key(), f.Value())
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		printAction("HEADER:", act)
-		if act.Code != milter.ActContinue {
-			return
-		}
-	}
-
-	act, err = s.HeaderEnd()
+	act, err = s.Header(hdr)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	printAction("EOH:", act)
+	printAction("HEADER:", act)
 	if act.Code != milter.ActContinue {
 		return
 	}
 
-	buf := make([]byte, milter.MaxBodyChunk)
-	for {
-		n, err := bufR.Read(buf)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			log.Println("stdin error:", err)
-			return
-		}
-		if n == 0 {
-			break
-		}
-
-		act, err = s.BodyChunk(buf[:n])
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		printAction("BODY:", act)
-		if act.Code != milter.ActContinue {
-			return
-		}
-	}
-
-	modifyActs, act, err := s.End()
+	modifyActs, act, err := s.Body(bufR)
 	if err != nil {
 		log.Println(err)
 		return
