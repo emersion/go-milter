@@ -104,11 +104,14 @@ func (s *ClientSession) negotiate(actionMask OptAction, protoMask OptProtocol) e
 	if Code(msg.Code) != CodeOptNeg {
 		return fmt.Errorf("milter: negotiate: unexpected code: %v", rune(msg.Code))
 	}
-	if len(msg.Data) != 4*3 /* version + action mask + proto mask */ {
+	if len(msg.Data) < 4*3 /* version + action mask + proto mask */ {
 		return fmt.Errorf("milter: negotiate: unexpected data size: %v", len(msg.Data))
 	}
 	milterVersion := binary.BigEndian.Uint32(msg.Data[:4])
-	if milterVersion != protocolVersion {
+
+	// Not a strict comparison since we might be able to work correctly with
+	// milter using a newer protocol as long as masks negotiated are meaningful.
+	if milterVersion < protocolVersion {
 		return fmt.Errorf("milter: negotiate: unsupported protocol version: %v", milterVersion)
 	}
 
@@ -388,7 +391,7 @@ func (s *ClientSession) BodyChunk(chunk []byte) (*Action, error) {
 		return &Action{Code: ActContinue}, nil
 	}
 
-	// Developers tend to be irresponsible... /s
+	// Callers tend to be irresponsible... /s
 	if len(chunk) > MaxBodyChunk {
 		return nil, fmt.Errorf("milter: body chunk: too big body chunk: %v", len(chunk))
 	}
