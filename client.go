@@ -149,18 +149,6 @@ func appendUint16(dest []byte, val uint16) []byte {
 	return dest
 }
 
-type ActionCode rune
-
-const (
-	ActAccept     ActionCode = accept
-	ActContinue   ActionCode = continue_
-	ActDiscard    ActionCode = discard
-	ActQuarantine ActionCode = quarantine
-	ActReject     ActionCode = reject
-	ActTempFail   ActionCode = tempFail
-	ActReplyCode  ActionCode = replyCode
-)
-
 type Action struct {
 	Code ActionCode
 
@@ -442,18 +430,6 @@ func (s *ClientSession) Body(r io.Reader) ([]ModifyAction, *Action, error) {
 
 	return s.End()
 }
-
-type ModifyActCode byte
-
-const (
-	ActAddRcpt      ModifyActCode = '+'
-	ActDelRcpt      ModifyActCode = '-'
-	ActReplBody     ModifyActCode = 'b'
-	ActAddHeader    ModifyActCode = 'h'
-	ActChangeHeader ModifyActCode = 'm'
-	ActInsertHeader ModifyActCode = 'i'
-	ActChangeFrom   ModifyActCode = 'e'
-)
 
 type ModifyAction struct {
 	Code ModifyActCode

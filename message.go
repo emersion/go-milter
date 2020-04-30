@@ -6,16 +6,28 @@ type Message struct {
 	Data []byte
 }
 
-// Define milter response codes
-// TODO(foxcpp): Get rid of these in favor of Act* constants.
+type ActionCode byte
+
 const (
-	accept     = 'a'
-	continue_  = 'c'
-	discard    = 'd'
-	quarantine = 'q'
-	reject     = 'r'
-	tempFail   = 't'
-	replyCode  = 'y'
+	ActAccept     ActionCode = 'a'
+	ActContinue   ActionCode = 'c'
+	ActDiscard    ActionCode = 'd'
+	ActQuarantine ActionCode = 'q'
+	ActReject     ActionCode = 'r'
+	ActTempFail   ActionCode = 't'
+	ActReplyCode  ActionCode = 'y'
+)
+
+type ModifyActCode byte
+
+const (
+	ActAddRcpt      ModifyActCode = '+'
+	ActDelRcpt      ModifyActCode = '-'
+	ActReplBody     ModifyActCode = 'b'
+	ActAddHeader    ModifyActCode = 'h'
+	ActChangeHeader ModifyActCode = 'm'
+	ActInsertHeader ModifyActCode = 'i'
+	ActChangeFrom   ModifyActCode = 'e'
 )
 
 // Milter protocol version implemented by this package.

@@ -131,7 +131,7 @@ func TestMilterClient_UsualFlow(t *testing.T) {
 		HdrResp:       RespContinue,
 		HdrsResp:      RespContinue,
 		BodyChunkResp: RespContinue,
-		BodyResp:      SimpleResponse(quarantine),
+		BodyResp:      SimpleResponse(ActQuarantine),
 		BodyMod: func(m *Modifier) {
 			m.AddHeader("X-Bad", "very")
 			m.ChangeHeader(1, "Subject", "***SPAM***")

@@ -17,16 +17,16 @@ func (r SimpleResponse) Response() *Message {
 
 // Continue to process milter messages only if current code is Continue
 func (r SimpleResponse) Continue() bool {
-	return byte(r) == continue_
+	return ActionCode(r) == ActContinue
 }
 
 // Define standard responses with no data
 const (
-	RespAccept   = SimpleResponse(accept)
-	RespContinue = SimpleResponse(continue_)
-	RespDiscard  = SimpleResponse(discard)
-	RespReject   = SimpleResponse(reject)
-	RespTempFail = SimpleResponse(tempFail)
+	RespAccept   = SimpleResponse(ActAccept)
+	RespContinue = SimpleResponse(ActContinue)
+	RespDiscard  = SimpleResponse(ActDiscard)
+	RespReject   = SimpleResponse(ActReject)
+	RespTempFail = SimpleResponse(ActTempFail)
 )
 
 // CustomResponse is a response instance used by callback handlers to indicate
@@ -43,8 +43,8 @@ func (c *CustomResponse) Response() *Message {
 
 // Continue returns false if milter chain should be stopped, true otherwise
 func (c *CustomResponse) Continue() bool {
-	for _, q := range []byte{accept, discard, reject, tempFail} {
-		if c.code == q {
+	for _, q := range []ActionCode{ActAccept, ActDiscard, ActReject, ActTempFail} {
+		if c.code == byte(q) {
 			return false
 		}
 	}
