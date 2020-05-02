@@ -9,13 +9,12 @@ type Message struct {
 type ActionCode byte
 
 const (
-	ActAccept     ActionCode = 'a'
-	ActContinue   ActionCode = 'c'
-	ActDiscard    ActionCode = 'd'
-	ActQuarantine ActionCode = 'q'
-	ActReject     ActionCode = 'r'
-	ActTempFail   ActionCode = 't'
-	ActReplyCode  ActionCode = 'y'
+	ActAccept    ActionCode = 'a'
+	ActContinue  ActionCode = 'c'
+	ActDiscard   ActionCode = 'd'
+	ActReject    ActionCode = 'r'
+	ActTempFail  ActionCode = 't'
+	ActReplyCode ActionCode = 'y'
 )
 
 type ModifyActCode byte
@@ -28,6 +27,7 @@ const (
 	ActChangeHeader ModifyActCode = 'm'
 	ActInsertHeader ModifyActCode = 'i'
 	ActChangeFrom   ModifyActCode = 'e'
+	ActQuarantine   ModifyActCode = 'q'
 )
 
 // Milter protocol version implemented by this package.

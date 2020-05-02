@@ -156,9 +156,6 @@ func appendUint16(dest []byte, val uint16) []byte {
 type Action struct {
 	Code ActionCode
 
-	// Quarantine reason if Code == ActQurantine.
-	Reason string
-
 	// SMTP code if Code == ActReplyCode.
 	SMTPCode int
 	// Reply text if Code == ActReplyCode.
@@ -190,8 +187,6 @@ func parseAction(msg *Message) (*Action, error) {
 
 	switch ActionCode(msg.Code) {
 	case ActAccept, ActContinue, ActDiscard, ActReject, ActTempFail:
-	case ActQuarantine:
-		act.Reason = readCString(msg.Data)
 	case ActReplyCode:
 		if len(msg.Data) <= 4 {
 			return nil, fmt.Errorf("action read: unexpected data length: %v", len(msg.Data))
@@ -469,6 +464,9 @@ type ModifyAction struct {
 	// ActChangeHeader or ActInsertHeader. If set to empty string - the field
 	// should be removed.
 	HdrValue string
+
+	// Quarantine reason if Code == ActQuarantine.
+	Reason string
 }
 
 func parseModifyAct(msg *Message) (*ModifyAction, error) {
@@ -479,6 +477,8 @@ func parseModifyAct(msg *Message) (*ModifyAction, error) {
 	switch ModifyActCode(msg.Code) {
 	case ActAddRcpt, ActDelRcpt:
 		act.Rcpt = readCString(msg.Data)
+	case ActQuarantine:
+		act.Reason = readCString(msg.Data)
 	case ActReplBody:
 		act.Body = msg.Data
 	case ActChangeFrom:
@@ -524,7 +524,8 @@ func (s *ClientSession) readModifyActs() (modifyActs []ModifyAction, act *Action
 		}
 
 		switch ModifyActCode(msg.Code) {
-		case ActAddRcpt, ActDelRcpt, ActReplBody, ActChangeHeader, ActInsertHeader, ActAddHeader, ActChangeFrom:
+		case ActAddRcpt, ActDelRcpt, ActReplBody, ActChangeHeader, ActInsertHeader,
+			ActAddHeader, ActChangeFrom, ActQuarantine:
 			modifyAct, err := parseModifyAct(msg)
 			if err != nil {
 				return nil, nil, err
