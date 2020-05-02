@@ -116,8 +116,10 @@ char    value[]         Value of header, NUL terminated
 
 **
 
-'s'     SMFIR_SKIP          ???
+'s'     SMFIR_SKIP          Do not send more body chunks
 
-???
+A milter has received sufficiently many body chunks to make a decision, but still
+wants to perform message modification functions that are only allowed to be
+returned in response to SMFIC_BODYEOB.
 
 
