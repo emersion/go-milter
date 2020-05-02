@@ -128,6 +128,18 @@ func (s *ClientSession) negotiate(actionMask OptAction, protoMask OptProtocol) e
 	return nil
 }
 
+// ProtocolOption checks whether the option is set in negotiated options, that
+// is, requested by both sides.
+func (s *ClientSession) ProtocolOption(opt OptProtocol) bool {
+	return s.protoMask&opt != 0
+}
+
+// ActionOption checks whether the option is set in negotiated options, that
+// is, requested by both sides.
+func (s *ClientSession) ActionOption(opt OptAction) bool {
+	return s.actionMask&opt != 0
+}
+
 func (s *ClientSession) Macros(code Code, kv ...string) error {
 	// Note: kv is ...string with the expectation that the list of macro names
 	// will be static and not dynamically constructed.
