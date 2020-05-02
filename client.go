@@ -77,6 +77,8 @@ type ClientSession struct {
 	actionMask OptAction
 	protoMask  OptProtocol
 
+	needAbort bool
+
 	readTimeout  time.Duration
 	writeTimeout time.Duration
 }
@@ -120,6 +122,8 @@ func (s *ClientSession) negotiate(actionMask OptAction, protoMask OptProtocol) e
 	s.actionMask = actionMask & OptAction(milterActionMask)
 	milterProtoMask := binary.BigEndian.Uint32(msg.Data[8:])
 	s.protoMask = protoMask & OptProtocol(milterProtoMask)
+
+	s.needAbort = true
 
 	return nil
 }
@@ -169,6 +173,9 @@ func (s *ClientSession) readAction() (*Action, error) {
 		}
 		if msg.Code == 'p' /* progress */ {
 			continue
+		}
+		if ActionCode(msg.Code) != ActContinue {
+			s.needAbort = false
 		}
 
 		return parseAction(msg)
@@ -363,10 +370,12 @@ func (s *ClientSession) Header(hdr textproto.Header) (*Action, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		if act.Code != ActContinue {
 			return act, nil
 		}
 	}
+
 	return s.HeaderEnd()
 }
 
@@ -553,8 +562,14 @@ func (s *ClientSession) End() ([]ModifyAction, *Action, error) {
 }
 
 // Close releases resources associated with the session.
+//
+// If there a milter sequence in progress - it is aborted.
 func (s *ClientSession) Close() error {
-	// TODO(foxcpp): Send ABORT and return connection to the pool instead.
+	if s.needAbort {
+		writePacket(s.conn, &Message{
+			Code: byte(CodeAbort),
+		}, s.writeTimeout)
+	}
 
 	if err := writePacket(s.conn, &Message{
 		Code: byte(CodeQuit),
