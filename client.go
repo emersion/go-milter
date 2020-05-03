@@ -73,9 +73,13 @@ func (c *Client) Close() error {
 }
 
 type ClientSession struct {
-	conn       net.Conn
-	actionMask OptAction
-	protoMask  OptProtocol
+	conn net.Conn
+
+	// Bitmask of negotiated action options.
+	ActionOpts OptAction
+
+	// Bitmask of negotiated protocol options.
+	ProtocolOpts OptProtocol
 
 	needAbort bool
 
@@ -119,9 +123,9 @@ func (s *ClientSession) negotiate(actionMask OptAction, protoMask OptProtocol) e
 
 	// AND it with our mask in case milter does not do that.
 	milterActionMask := binary.BigEndian.Uint32(msg.Data[4:])
-	s.actionMask = actionMask & OptAction(milterActionMask)
+	s.ActionOpts = actionMask & OptAction(milterActionMask)
 	milterProtoMask := binary.BigEndian.Uint32(msg.Data[8:])
-	s.protoMask = protoMask & OptProtocol(milterProtoMask)
+	s.ProtocolOpts = protoMask & OptProtocol(milterProtoMask)
 
 	s.needAbort = true
 
@@ -131,13 +135,13 @@ func (s *ClientSession) negotiate(actionMask OptAction, protoMask OptProtocol) e
 // ProtocolOption checks whether the option is set in negotiated options, that
 // is, requested by both sides.
 func (s *ClientSession) ProtocolOption(opt OptProtocol) bool {
-	return s.protoMask&opt != 0
+	return s.ProtocolOpts&opt != 0
 }
 
 // ActionOption checks whether the option is set in negotiated options, that
 // is, requested by both sides.
 func (s *ClientSession) ActionOption(opt OptAction) bool {
-	return s.actionMask&opt != 0
+	return s.ActionOpts&opt != 0
 }
 
 func (s *ClientSession) Macros(code Code, kv ...string) error {
@@ -220,7 +224,7 @@ func parseAction(msg *Message) (*Action, error) {
 //
 // It should be called once per milter session (from NewSession to Close).
 func (s *ClientSession) Conn(hostname string, family ProtoFamily, port uint16, addr string) (*Action, error) {
-	if s.protoMask&OptNoConnect != 0 {
+	if s.ProtocolOpts&OptNoConnect != 0 {
 		return &Action{Code: ActContinue}, nil
 	}
 
@@ -253,7 +257,7 @@ func (s *ClientSession) Conn(hostname string, family ProtoFamily, port uint16, a
 func (s *ClientSession) Helo(helo string) (*Action, error) {
 	// Synthesise response as if server replied "go on" while in fact it does
 	// not support that message.
-	if s.protoMask&OptNoHelo != 0 {
+	if s.ProtocolOpts&OptNoHelo != 0 {
 		return &Action{Code: ActContinue}, nil
 	}
 
@@ -274,7 +278,7 @@ func (s *ClientSession) Helo(helo string) (*Action, error) {
 }
 
 func (s *ClientSession) Mail(sender string, esmtpArgs []string) (*Action, error) {
-	if s.protoMask&OptNoMailFrom != 0 {
+	if s.ProtocolOpts&OptNoMailFrom != 0 {
 		return &Action{Code: ActContinue}, nil
 	}
 
@@ -299,7 +303,7 @@ func (s *ClientSession) Mail(sender string, esmtpArgs []string) (*Action, error)
 }
 
 func (s *ClientSession) Rcpt(rcpt string, esmtpArgs []string) (*Action, error) {
-	if s.protoMask&OptNoRcptTo != 0 {
+	if s.ProtocolOpts&OptNoRcptTo != 0 {
 		return &Action{Code: ActContinue}, nil
 	}
 
@@ -327,7 +331,7 @@ func (s *ClientSession) Rcpt(rcpt string, esmtpArgs []string) (*Action, error) {
 //
 // HeaderEnd() must be called after the last field.
 func (s *ClientSession) HeaderField(key, value string) (*Action, error) {
-	if s.protoMask&OptNoHeaders != 0 {
+	if s.ProtocolOpts&OptNoHeaders != 0 {
 		return &Action{Code: ActContinue}, nil
 	}
 
@@ -352,7 +356,7 @@ func (s *ClientSession) HeaderField(key, value string) (*Action, error) {
 //
 // No HeaderField calls are allowed after this point.
 func (s *ClientSession) HeaderEnd() (*Action, error) {
-	if s.protoMask&OptNoEOH != 0 {
+	if s.ProtocolOpts&OptNoEOH != 0 {
 		return &Action{Code: ActContinue}, nil
 	}
 
@@ -391,7 +395,7 @@ func (s *ClientSession) Header(hdr textproto.Header) (*Action, error) {
 // It is callers responsibility to ensure every chunk is not bigger than
 // MaxBodyChunk.
 func (s *ClientSession) BodyChunk(chunk []byte) (*Action, error) {
-	if s.protoMask&OptNoBody != 0 {
+	if s.ProtocolOpts&OptNoBody != 0 {
 		return &Action{Code: ActContinue}, nil
 	}
 
