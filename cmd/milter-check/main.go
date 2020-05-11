@@ -21,8 +21,6 @@ func printAction(prefix string, act *milter.Action) {
 		log.Println(prefix, "discard")
 	case milter.ActTempFail:
 		log.Println(prefix, "temp. fail")
-	case milter.ActQuarantine:
-		log.Println(prefix, "quarantine:", act.Reason)
 	case milter.ActReplyCode:
 		log.Println(prefix, "reply code:", act.SMTPCode, act.SMTPText)
 	case milter.ActContinue:
@@ -33,19 +31,21 @@ func printAction(prefix string, act *milter.Action) {
 func printModifyAction(act milter.ModifyAction) {
 	switch act.Code {
 	case milter.ActAddHeader:
-		log.Printf("add header: name %s, value %s", act.HeaderName, aHeaderValuelue)
+		log.Printf("add header: name %s, value %s", act.HeaderName, act.HeaderValue)
 	case milter.ActInsertHeader:
-		log.Printf("insert header: at %d, name %s, value %s", act.HeaderIndex, act.HeaderName, aHeaderValuelue)
+		log.Printf("insert header: at %d, name %s, value %s", act.HeaderIndex, act.HeaderName, act.HeaderValue)
 	case milter.ActChangeFrom:
 		log.Printf("change from: %s %v", act.From, act.FromArgs)
 	case milter.ActChangeHeader:
-		log.Printf("change header: at %d, name %s, value %s", act.HeaderIndex, act.HeaderName, aHeaderValuelue)
+		log.Printf("change header: at %d, name %s, value %s", act.HeaderIndex, act.HeaderName, act.HeaderValue)
 	case milter.ActReplBody:
 		log.Println("replace body:", string(act.Body))
 	case milter.ActAddRcpt:
 		log.Println("add rcpt:", act.Rcpt)
 	case milter.ActDelRcpt:
 		log.Println("del rcpt:", act.Rcpt)
+	case milter.ActQuarantine:
+		log.Println("quarantine:", act.Reason)
 	}
 }
 
@@ -66,10 +66,13 @@ func main() {
 	disabledMsgs := flag.Uint("disabled-msgs", 0, "Bitmask of disabled protocol messages")
 	flag.Parse()
 
-	c := milter.NewClient(*transport, *address)
+	c := milter.NewClientWithOptions(*transport, *address, milter.ClientOptions{
+		ActionMask:   milter.OptAction(*actionMask),
+		ProtocolMask: milter.OptProtocol(*disabledMsgs),
+	})
 	defer c.Close()
 
-	s, err := c.Session(milter.OptAction(*actionMask), milter.OptProtocol(*disabledMsgs))
+	s, err := c.Session()
 	if err != nil {
 		log.Println(err)
 		return
@@ -135,7 +138,7 @@ func main() {
 		return
 	}
 
-	modifyActs, act, err := s.Body(bufR)
+	modifyActs, act, err := s.BodyReadFrom(bufR)
 	if err != nil {
 		log.Println(err)
 		return
