@@ -17,7 +17,9 @@ import (
 // Currently it just creates new connections using provided Dialer.
 type Client struct {
 	// Dialer is used to establish new connections to the milter.
-	// Set to empty net.Dialer{} by NewClient.
+	//
+	// It is racy to change Dialer after first Session call. Changes may be
+	// ignored if Client reuses existing connections.
 	Dialer interface {
 		Dial(network string, addr string) (net.Conn, error)
 	}
@@ -25,6 +27,10 @@ type Client struct {
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
 
+	// Network and Address are passed as arguments to Dialer.Dial.
+	//
+	// Same restrictions apply - it may be unsafe to change it after first
+	// Session call.
 	Network string
 	Address string
 }
@@ -220,9 +226,9 @@ func parseAction(msg *Message) (*Action, error) {
 	return act, nil
 }
 
-// Helo sends the connection information to the milter.
+// Conn sends the connection information to the milter.
 //
-// It should be called once per milter session (from NewSession to Close).
+// It should be called once per milter session (from Session to Close).
 func (s *ClientSession) Conn(hostname string, family ProtoFamily, port uint16, addr string) (*Action, error) {
 	if s.ProtocolOpts&OptNoConnect != 0 {
 		return &Action{Code: ActContinue}, nil
@@ -253,7 +259,7 @@ func (s *ClientSession) Conn(hostname string, family ProtoFamily, port uint16, a
 
 // Helo sends the HELO hostname to the milter.
 //
-// It should be called once per milter session (from NewSession to Close).
+// It should be called once per milter session (from Session to Close).
 func (s *ClientSession) Helo(helo string) (*Action, error) {
 	// Synthesise response as if server replied "go on" while in fact it does
 	// not support that message.
@@ -328,6 +334,8 @@ func (s *ClientSession) Rcpt(rcpt string, esmtpArgs []string) (*Action, error) {
 }
 
 // HeaderField sends a single header field to the milter.
+//
+// Value should be the original field value without any unfolding applied.
 //
 // HeaderEnd() must be called after the last field.
 func (s *ClientSession) HeaderField(key, value string) (*Action, error) {
@@ -418,11 +426,11 @@ func (s *ClientSession) BodyChunk(chunk []byte) (*Action, error) {
 	return act, nil
 }
 
-// Body is a helper function that calls BodyChunk repeately to transmit entire
+// BodyReadFrom is a helper function that calls BodyChunk repeately to transmit entire
 // body from io.Reader and then calls End.
 //
 // See documentation for these functions for details.
-func (s *ClientSession) Body(r io.Reader) ([]ModifyAction, *Action, error) {
+func (s *ClientSession) BodyReadFrom(r io.Reader) ([]ModifyAction, *Action, error) {
 	// It is problematic to use io.WriteCloser since we may need to report
 	// action after each write.
 
@@ -468,18 +476,18 @@ type ModifyAction struct {
 
 	// Index of the header field to be changed if Code = ActChangeHeader or Code = ActInsertHeader.
 	// Index is 1-based and is per value of HdrName.
-	// E.g. HdrIndex = 3 and HdrName = "DKIM-Signature" mean "change third
+	// E.g. HeaderIndex = 3 and HdrName = "DKIM-Signature" mean "change third
 	// DKIM-Signature field". Order is the same as of HeaderField calls.
-	HdrIndex uint32
+	HeaderIndex uint32
 
 	// Header field name to be added/changed if Code == ActAddHeader or
 	// ActChangeHeader or ActInsertHeader.
-	HdrName string
+	HeaderName string
 
 	// Header field value to be added/changed if Code == ActAddHeader or
 	// ActChangeHeader or ActInsertHeader. If set to empty string - the field
 	// should be removed.
-	HdrValue string
+	HeaderValue string
 
 	// Quarantine reason if Code == ActQuarantine.
 	Reason string
@@ -507,13 +515,13 @@ func parseModifyAct(msg *Message) (*ModifyAction, error) {
 		if len(msg.Data) < 4 {
 			return nil, fmt.Errorf("read modify action: missing header index")
 		}
-		act.HdrIndex = binary.BigEndian.Uint32(msg.Data)
+		act.HeaderIndex = binary.BigEndian.Uint32(msg.Data)
 
 		msg.Data = msg.Data[4:]
 		fallthrough
 	case ActAddHeader:
 		// TODO: Change readCString to return last index.
-		act.HdrName = readCString(msg.Data)
+		act.HeaderName = readCString(msg.Data)
 		nul := bytes.IndexByte(msg.Data, 0x00)
 		if nul == -1 {
 			return nil, fmt.Errorf("read modify action: missing NUL delimiter")
@@ -521,7 +529,7 @@ func parseModifyAct(msg *Message) (*ModifyAction, error) {
 		if nul == len(msg.Data) {
 			return nil, fmt.Errorf("read modify action: missing header value")
 		}
-		act.HdrValue = readCString(msg.Data[nul+1:])
+		act.HeaderValue = readCString(msg.Data[nul+1:])
 	default:
 		return nil, fmt.Errorf("read modify action: unexpected message code: %v", msg.Code)
 	}
@@ -593,5 +601,5 @@ func (s *ClientSession) Close() error {
 	}, s.writeTimeout); err != nil {
 		return fmt.Errorf("milter: close: %w", err)
 	}
-	return s.Close()
+	return s.conn.Close()
 }

@@ -131,10 +131,11 @@ func TestMilterClient_UsualFlow(t *testing.T) {
 		HdrResp:       RespContinue,
 		HdrsResp:      RespContinue,
 		BodyChunkResp: RespContinue,
-		BodyResp:      SimpleResponse(ActQuarantine),
+		BodyResp:      RespContinue,
 		BodyMod: func(m *Modifier) {
 			m.AddHeader("X-Bad", "very")
 			m.ChangeHeader(1, "Subject", "***SPAM***")
+			m.Quarantine("very bad message")
 		},
 	}
 	s := Server{
@@ -156,6 +157,7 @@ func TestMilterClient_UsualFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer session.Close()
 
 	assertAction := func(act *Action, err error, expectCode ActionCode) {
 		t.Helper()
@@ -221,8 +223,8 @@ func TestMilterClient_UsualFlow(t *testing.T) {
 		t.Fatal("Wrong To header:", val)
 	}
 
-	modifyActs, act, err := session.Body(bytes.NewReader(bytes.Repeat([]byte{'A'}, 128000)))
-	assertAction(act, err, ActQuarantine)
+	modifyActs, act, err := session.BodyReadFrom(bytes.NewReader(bytes.Repeat([]byte{'A'}, 128000)))
+	assertAction(act, err, ActContinue)
 
 	if len(mm.Chunks) != 2 {
 		t.Fatal("Wrong amount of body chunks received")
@@ -236,15 +238,19 @@ func TestMilterClient_UsualFlow(t *testing.T) {
 
 	expected := []ModifyAction{
 		{
-			Code:     ActAddHeader,
-			HdrName:  "X-Bad",
-			HdrValue: "very",
+			Code:        ActAddHeader,
+			HeaderName:  "X-Bad",
+			HeaderValue: "very",
 		},
 		{
-			Code:     ActChangeHeader,
-			HdrIndex: 1,
-			HdrName:  "Subject",
-			HdrValue: "***SPAM***",
+			Code:        ActChangeHeader,
+			HeaderIndex: 1,
+			HeaderName:  "Subject",
+			HeaderValue: "***SPAM***",
+		},
+		{
+			Code:   ActQuarantine,
+			Reason: "very bad message",
 		},
 	}
 

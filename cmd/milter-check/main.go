@@ -33,13 +33,13 @@ func printAction(prefix string, act *milter.Action) {
 func printModifyAction(act milter.ModifyAction) {
 	switch act.Code {
 	case milter.ActAddHeader:
-		log.Printf("add header: name %s, value %s", act.HdrName, act.HdrValue)
+		log.Printf("add header: name %s, value %s", act.HeaderName, aHeaderValuelue)
 	case milter.ActInsertHeader:
-		log.Printf("insert header: at %d, name %s, value %s", act.HdrIndex, act.HdrName, act.HdrValue)
+		log.Printf("insert header: at %d, name %s, value %s", act.HeaderIndex, act.HeaderName, aHeaderValuelue)
 	case milter.ActChangeFrom:
 		log.Printf("change from: %s %v", act.From, act.FromArgs)
 	case milter.ActChangeHeader:
-		log.Printf("change header: at %d, name %s, value %s", act.HdrIndex, act.HdrName, act.HdrValue)
+		log.Printf("change header: at %d, name %s, value %s", act.HeaderIndex, act.HeaderName, aHeaderValuelue)
 	case milter.ActReplBody:
 		log.Println("replace body:", string(act.Body))
 	case milter.ActAddRcpt:
