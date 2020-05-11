@@ -151,9 +151,11 @@ func TestMilterClient_UsualFlow(t *testing.T) {
 	}
 	go s.Serve(local)
 
-	cl := NewClient("tcp", local.Addr().String())
+	cl := NewClientWithOptions("tcp", local.Addr().String(), ClientOptions{
+		ActionMask: OptAddHeader | OptChangeHeader | OptQuarantine,
+	})
 	defer cl.Close()
-	session, err := cl.Session(OptAddHeader|OptChangeHeader|OptQuarantine, 0)
+	session, err := cl.Session()
 	if err != nil {
 		t.Fatal(err)
 	}

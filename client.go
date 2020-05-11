@@ -16,57 +16,74 @@ import (
 //
 // Currently it just creates new connections using provided Dialer.
 type Client struct {
-	// Dialer is used to establish new connections to the milter.
-	//
-	// It is racy to change Dialer after first Session call. Changes may be
-	// ignored if Client reuses existing connections.
-	Dialer interface {
-		Dial(network string, addr string) (net.Conn, error)
-	}
+	opts    ClientOptions
+	network string
+	address string
+}
 
+type Dialer interface {
+	Dial(network string, addr string) (net.Conn, error)
+}
+
+type ClientOptions struct {
+	Dialer       Dialer
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
-
-	// Network and Address are passed as arguments to Dialer.Dial.
-	//
-	// Same restrictions apply - it may be unsafe to change it after first
-	// Session call.
-	Network string
-	Address string
+	ActionMask   OptAction
+	ProtocolMask OptProtocol
 }
 
-// NewClient creates a new Client instance populating fields with default
-// values.
+var defaultOptions = ClientOptions{
+	Dialer: &net.Dialer{
+		Timeout: 10 * time.Second,
+	},
+	ReadTimeout:  10 * time.Second,
+	WriteTimeout: 10 * time.Second,
+	ActionMask:   OptAddHeader | OptAddRcpt | OptChangeBody | OptChangeFrom | OptChangeHeader,
+	ProtocolMask: 0,
+}
+
+// NewDefaultClient creates a new Client object using default options.
 //
-// Dialer is net.Dialer with 10 second timeout, Read and Write timeouts are set
-// to 10 seconds too.
-func NewClient(network, address string) *Client {
+// It uses 10 seconds for connection/read/write timeouts and allows milter to
+// send any actions supported by library.
+func NewDefaultClient(network, address string) *Client {
+	return NewClientWithOptions(network, address, defaultOptions)
+}
+
+// NewClientWithOptions creates a new Client object using provided options.
+//
+// You generally want to use options to restrict ActionMask to what your code
+// supports and ProtocolMask to what you intend to submit.
+//
+// If opts.Dialer is not set, empty net.Dialer object will be used.
+func NewClientWithOptions(network, address string, opts ClientOptions) *Client {
+	if opts.Dialer == nil {
+		opts.Dialer = &net.Dialer{}
+	}
+
 	return &Client{
-		Dialer: &net.Dialer{
-			Timeout: 10 * time.Second,
-		},
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		Network:      network,
-		Address:      address,
+		opts:    opts,
+		network: network,
+		address: address,
 	}
 }
 
-func (c *Client) Session(actionMask OptAction, protoMask OptProtocol) (*ClientSession, error) {
+func (c *Client) Session() (*ClientSession, error) {
 	s := &ClientSession{
-		readTimeout:  c.ReadTimeout,
-		writeTimeout: c.WriteTimeout,
+		readTimeout:  c.opts.ReadTimeout,
+		writeTimeout: c.opts.WriteTimeout,
 	}
 
 	// TODO(foxcpp): Connection pooling.
 
-	conn, err := c.Dialer.Dial(c.Network, c.Address)
+	conn, err := c.opts.Dialer.Dial(c.network, c.address)
 	if err != nil {
 		return nil, fmt.Errorf("milter: session create: %w", err)
 	}
 
 	s.conn = conn
-	if err := s.negotiate(actionMask, protoMask); err != nil {
+	if err := s.negotiate(c.opts.ActionMask, c.opts.ProtocolMask); err != nil {
 		return nil, err
 	}
 
