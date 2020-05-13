@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/textproto"
 	"strings"
+	"time"
 )
 
 var errCloseSession = errors.New("Stop current milter processing")
@@ -56,15 +57,24 @@ type milterSession struct {
 
 // ReadPacket reads incoming milter packet
 func (c *milterSession) ReadPacket() (*Message, error) {
+	return readPacket(c.conn, 0)
+}
+
+func readPacket(conn net.Conn, timeout time.Duration) (*Message, error) {
+	if timeout != 0 {
+		conn.SetReadDeadline(time.Now().Add(timeout))
+		defer conn.SetReadDeadline(time.Time{})
+	}
+
 	// read packet length
 	var length uint32
-	if err := binary.Read(c.conn, binary.BigEndian, &length); err != nil {
+	if err := binary.Read(conn, binary.BigEndian, &length); err != nil {
 		return nil, err
 	}
 
 	// read packet data
 	data := make([]byte, length)
-	if _, err := io.ReadFull(c.conn, data); err != nil {
+	if _, err := io.ReadFull(conn, data); err != nil {
 		return nil, err
 	}
 
@@ -79,7 +89,16 @@ func (c *milterSession) ReadPacket() (*Message, error) {
 
 // WritePacket sends a milter response packet to socket stream
 func (m *milterSession) WritePacket(msg *Message) error {
-	buffer := bufio.NewWriter(m.conn)
+	return writePacket(m.conn, msg, 0)
+}
+
+func writePacket(conn net.Conn, msg *Message, timeout time.Duration) error {
+	if timeout != 0 {
+		conn.SetWriteDeadline(time.Now().Add(timeout))
+		defer conn.SetWriteDeadline(time.Time{})
+	}
+
+	buffer := bufio.NewWriter(conn)
 
 	// calculate and write response length
 	length := uint32(len(msg.Data) + 1)

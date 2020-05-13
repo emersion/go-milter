@@ -1,0 +1,125 @@
+This is an extension of milter-protocol.txt document which attempts to document
+changes made to the milter protocol.
+
+What is described here together with milter-protocol.txt is believed to be
+milter protocol version 6 as understood by sendmail 8.15.2 and libmilter 1.0.1.
+
+----------------------
+Protocol negotiation
+
+Actions:
+
+0x00000001    SMFIF_ADDHDRS         Add headers (SMFIR_ADDHEADER) [v1]
+                                      *and insert headers (SMFIR_INSHEADER)*
+0x00000002    SMFIF_CHGBODY         Change body chunks (SMFIR_REPLBODY) [v1]
+0x00000004    SMFIF_ADDRCPT         Add recipients (SMFIR_ADDRCPT) [v1]
+0x00000008    SMFIF_DELRCPT         Remove recipients (SMFIR_DELRCPT) [v1]
+0x00000010    SMFIF_CHGHDRS         Change or delete headers (SMFIR_CHGHEADER) [v2]
+0x00000020    SMFIF_QUARANTINE      Quarantine message (SMFIR_QUARANTINE) [v2]
+
+0x00000040    SMFIF_CHGFROM         Change envelope sender (SMFIR_CHGFROM)
+0x00000080    SMFIF_ADDRCPT_PAR     Add recipient with ESMTP args
+
+0x00000100    SMFIF_SETSYMLIST      Send set of macros needed
+
+Protocol flags:
+
+0x00000001  SMFIP_NOCONNECT     Skip SMFIC_CONNECT [v1]
+0x00000002  SMFIP_NOHELO        Skip SMFIC_HELO [v1]
+0x00000004  SMFIP_NOMAIL        Skip SMFIC_MAIL [v1]
+0x00000008  SMFIP_NORCPT        Skip SMFIC_RCPT [v1]
+0x00000010  SMFIP_NOBODY        Skip SMFIC_BODY [v1]
+0x00000020  SMFIP_NOHDRS        Skip SMFIC_HEADER [v1]
+0x00000040  SMFIP_NOEOH         Skip SMFIC_EOH [v2]
+
+0x00000080  SMFIP_NR_HDR        No reply for SMFIC_HEADER
+0x00000100  SMFIP_NOUNKNOWN     MTA should not send unknown commands
+0x00000200  SMFIP_NODATA        MTA should not send DATA
+0x00000400  SMFIP_SKIP          MTA understands SMFIS_SKIP
+0x00000800  SMFIP_RCPT_REJ      MTA should also send rejected RCPTs
+0x00001000  SMFIP_NR_CONN       No reply for SMFIC_CONNECT
+0x00002000  SMFIP_NR_HELO       No reply for SMFIC_HELO
+0x00004000  SMFIP_NR_MAIL       No reply for SMFIC_MAIL
+0x00008000  SMFIP_NR_RCPT       No reply for SMFIC_RCPT
+0x00010000  SMFIP_NR_DATA       No reply for SMFIC_DATA
+0x00020000  SMFIP_NR_UNKN       No reply for SMFIC_UNKN
+0x00040000  SMFIP_NR_EOH        No reply for SMFIC_EOH
+0x00080000  SMFIP_NR_BODY       No reply for body chunk
+0x00100000  SMFIP_HDR_LEADSPC   Header value leading space **
+0x10000000  SMFIP_MDS_256K      Max DATA size = 256K (?)
+0x20000000  SMFIP_MDS_1M        Max DATA size = 1M (?)
+
+[**] From libmilter docs: Indicates that the MTA can send header values with
+leading space intact.  If this protocol step is requested, then the MTA will
+also not add a leading space to headers when they are added, inserted, or
+changed.
+
+----------------
+Command codes
+
+**
+
+'K'     SMFIC_QUIC_NC       QUIT but new connection follows
+
+???
+
+**
+
+'T'     SMFIC_DATA          DATA
+
+Called when the client uses the DATA command.
+
+**
+
+'U'     SMFIC_UNKNOWN       Any unknown command (?)
+
+???
+
+----------------
+Response codes
+
+**
+
+'2'     SMFIR_ADDRCPT_PAR   Add recipient with ESMTP args
+
+char    args[][]            Array of strings, NUL terminated (address at index 0)
+                            args[0] is recipient, with <> qualification.
+                            args[1] and beyond are ESMTP arguments, if any
+
+**
+
+'e'     SMFIR_CHGFROM       Replace envelope from address
+
+char    args[][]            Array of strings, NUL terminated (address at index 0)
+                            args[0] is sender, with <> qualification.
+                            args[1] and beyond are ESMTP arguments, if any
+
+**
+
+'f'     SMFIR_CONN_FAIL     Cause a connection failure
+
+???
+
+**
+
+'i'     SMFIR_INSHEADER     Insert header at a specified position (modification action)
+
+uint32  index           Index into header list where insertion should occur
+char    name[]          Name of header, NUL terminated
+char    value[]         Value of header, NUL terminated
+
+**
+
+'l'     SMFIR_SETSYMLIST    Set list of symbols (macros)
+
+???
+
+**
+
+'s'     SMFIR_SKIP          Do not send more body chunks
+
+A milter has received sufficiently many body chunks to make a decision, but still
+wants to perform message modification functions that are only allowed to be
+returned in response to SMFIC_BODYEOB.
+
+

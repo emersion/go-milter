@@ -24,3 +24,10 @@ func readCString(data []byte) string {
 	}
 	return string(data[0:pos])
 }
+
+// appendCString appends a C style string to the buffer and returns it (like append does).
+func appendCString(dest []byte, s string) []byte {
+	dest = append(dest, []byte(s)...)
+	dest = append(dest, 0x00)
+	return dest
+}
