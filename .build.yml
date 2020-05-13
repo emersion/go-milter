@@ -1,0 +1,19 @@
+image: alpine/edge
+packages:
+  - go
+  # Required by codecov
+  - bash
+  - findutils
+sources:
+  - https://github.com/emersion/go-milter
+tasks:
+  - build: |
+      cd go-milter
+      go build -v ./...
+  - test: |
+      cd go-milter
+      go test -coverprofile=coverage.txt -covermode=atomic ./...
+  - upload-coverage: |
+      cd go-milter
+      export CODECOV_TOKEN=8c0f7014-fcfa-4ed9-8972-542eb5958fb3
+      curl -s https://codecov.io/bash | bash
