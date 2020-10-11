@@ -34,7 +34,7 @@ const (
 //
 // Note: Not exported as we might want to support multiple versions
 // transparently in the future.
-const protocolVersion = 2
+const protocolVersion = 6
 
 type Code byte
 

@@ -220,7 +220,7 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 		// ignore request and prepare response buffer
 		buffer := new(bytes.Buffer)
 		// prepare response data
-		for _, value := range []uint32{2, uint32(m.actions), uint32(m.protocol)} {
+		for _, value := range []uint32{protocolVersion, uint32(m.actions), uint32(m.protocol)} {
 			if err := binary.Write(buffer, binary.BigEndian, value); err != nil {
 				return nil, err
 			}
