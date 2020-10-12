@@ -113,8 +113,7 @@ type ClientSession struct {
 // negotiate exchanges OPTNEG messages with the milter and sets s.mask to the
 // negotiated value.
 func (s *ClientSession) negotiate(actionMask OptAction, protoMask OptProtocol) error {
-	// Send our mask, get mask from milter and take the lowest common
-	// denomiator as the effective mask.
+	// Send our mask, get mask from milter..
 	msg := &Message{
 		Code: byte(CodeOptNeg), // TODO(foxcpp): Get rid of casts by changing msg.Code to have Code type
 		Data: make([]byte, 4*3),
@@ -144,11 +143,10 @@ func (s *ClientSession) negotiate(actionMask OptAction, protoMask OptProtocol) e
 		return fmt.Errorf("milter: negotiate: unsupported protocol version: %v", milterVersion)
 	}
 
-	// AND it with our mask in case milter does not do that.
 	milterActionMask := binary.BigEndian.Uint32(msg.Data[4:])
-	s.ActionOpts = actionMask & OptAction(milterActionMask)
+	s.ActionOpts = OptAction(milterActionMask)
 	milterProtoMask := binary.BigEndian.Uint32(msg.Data[8:])
-	s.ProtocolOpts = protoMask & OptProtocol(milterProtoMask)
+	s.ProtocolOpts = OptProtocol(milterProtoMask)
 
 	s.needAbort = true
 
@@ -267,11 +265,14 @@ func (s *ClientSession) Conn(hostname string, family ProtoFamily, port uint16, a
 		return nil, fmt.Errorf("milter: conn: %w", err)
 	}
 
-	act, err := s.readAction()
-	if err != nil {
-		return nil, fmt.Errorf("milter: conn: %w", err)
+	if !s.ProtocolOption(OptNoConnReply) {
+		act, err := s.readAction()
+		if err != nil {
+			return nil, fmt.Errorf("milter: conn: %w", err)
+		}
+		return act, nil
 	}
-	return act, nil
+	return &Action{Code: ActContinue}, nil
 }
 
 // Helo sends the HELO hostname to the milter.
@@ -293,11 +294,14 @@ func (s *ClientSession) Helo(helo string) (*Action, error) {
 		return nil, fmt.Errorf("milter: helo: %w", err)
 	}
 
-	act, err := s.readAction()
-	if err != nil {
-		return nil, fmt.Errorf("milter: helo: %w", err)
+	if !s.ProtocolOption(OptNoHeloReply) {
+		act, err := s.readAction()
+		if err != nil {
+			return nil, fmt.Errorf("milter: helo: %w", err)
+		}
+		return act, nil
 	}
-	return act, nil
+	return &Action{Code: ActContinue}, nil
 }
 
 func (s *ClientSession) Mail(sender string, esmtpArgs []string) (*Action, error) {
@@ -318,11 +322,14 @@ func (s *ClientSession) Mail(sender string, esmtpArgs []string) (*Action, error)
 		return nil, fmt.Errorf("milter: mail: %w", err)
 	}
 
-	act, err := s.readAction()
-	if err != nil {
-		return nil, fmt.Errorf("milter: mail: %w", err)
+	if !s.ProtocolOption(OptNoMailReply) {
+		act, err := s.readAction()
+		if err != nil {
+			return nil, fmt.Errorf("milter: mail: %w", err)
+		}
+		return act, nil
 	}
-	return act, nil
+	return &Action{Code: ActContinue}, nil
 }
 
 func (s *ClientSession) Rcpt(rcpt string, esmtpArgs []string) (*Action, error) {
@@ -343,11 +350,14 @@ func (s *ClientSession) Rcpt(rcpt string, esmtpArgs []string) (*Action, error) {
 		return nil, fmt.Errorf("milter: rcpt: %w", err)
 	}
 
-	act, err := s.readAction()
-	if err != nil {
-		return nil, fmt.Errorf("milter: rcpt: %w", err)
+	if !s.ProtocolOption(OptNoRcptReply) {
+		act, err := s.readAction()
+		if err != nil {
+			return nil, fmt.Errorf("milter: rcpt: %w", err)
+		}
+		return act, nil
 	}
-	return act, nil
+	return &Action{Code: ActContinue}, nil
 }
 
 // HeaderField sends a single header field to the milter.
@@ -370,11 +380,14 @@ func (s *ClientSession) HeaderField(key, value string) (*Action, error) {
 		return nil, fmt.Errorf("milter: header field: %w", err)
 	}
 
-	act, err := s.readAction()
-	if err != nil {
-		return nil, fmt.Errorf("milter: header field: %w", err)
+	if !s.ProtocolOption(OptNoHeaderReply) {
+		act, err := s.readAction()
+		if err != nil {
+			return nil, fmt.Errorf("milter: header field: %w", err)
+		}
+		return act, nil
 	}
-	return act, nil
+	return &Action{Code: ActContinue}, nil
 }
 
 // HeaderEnd send the EOH (End-Of-Header) message to the milter.
@@ -391,11 +404,14 @@ func (s *ClientSession) HeaderEnd() (*Action, error) {
 		return nil, fmt.Errorf("milter: header end: %w", err)
 	}
 
-	act, err := s.readAction()
-	if err != nil {
-		return nil, fmt.Errorf("milter: header end: %w", err)
+	if !s.ProtocolOption(OptNoEOHReply) {
+		act, err := s.readAction()
+		if err != nil {
+			return nil, fmt.Errorf("milter: header end: %w", err)
+		}
+		return act, nil
 	}
-	return act, nil
+	return &Action{Code: ActContinue}, nil
 }
 
 // Header sends each field from textproto.Header followed by EOH unless
@@ -436,11 +452,14 @@ func (s *ClientSession) BodyChunk(chunk []byte) (*Action, error) {
 		return nil, fmt.Errorf("milter: body chunk: %w", err)
 	}
 
-	act, err := s.readAction()
-	if err != nil {
-		return nil, fmt.Errorf("milter: body chunk: %w", err)
+	if !s.ProtocolOption(OptNoBodyReply) {
+		act, err := s.readAction()
+		if err != nil {
+			return nil, fmt.Errorf("milter: body chunk: %w", err)
+		}
+		return act, nil
 	}
-	return act, nil
+	return &Action{Code: ActContinue}, nil
 }
 
 // BodyReadFrom is a helper function that calls BodyChunk repeately to transmit entire

@@ -34,7 +34,6 @@ const (
 // Multiple options can be set using a bitmask.
 type OptProtocol uint32
 
-// mask out unwanted parts of the SMTP transaction
 const (
 	OptNoConnect  OptProtocol = 0x01
 	OptNoHelo     OptProtocol = 0x02
@@ -43,6 +42,17 @@ const (
 	OptNoBody     OptProtocol = 0x10
 	OptNoHeaders  OptProtocol = 0x20
 	OptNoEOH      OptProtocol = 0x40
+
+	// [v6] milter will not send action response for following MTA messages.
+	OptNoHeaderReply  OptProtocol = 0x80
+	OptNoConnReply    OptProtocol = 0x1000
+	OptNoHeloReply    OptProtocol = 0x2000
+	OptNoMailReply    OptProtocol = 0x4000
+	OptNoRcptReply    OptProtocol = 0x8000
+	OptNoDataReply    OptProtocol = 0x10000
+	OptNoUnknownReply OptProtocol = 0x20000
+	OptNoEOHReply     OptProtocol = 0x40000
+	OptNoBodyReply    OptProtocol = 0x80000
 )
 
 // milterSession keeps session state during MTA communication
