@@ -15,6 +15,7 @@ const (
 	ActReject    ActionCode = 'r'
 	ActTempFail  ActionCode = 't'
 	ActReplyCode ActionCode = 'y'
+	ActSkip      ActionCode = 's'
 )
 
 type ModifyActCode byte

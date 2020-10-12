@@ -43,6 +43,9 @@ const (
 	OptNoHeaders  OptProtocol = 0x20
 	OptNoEOH      OptProtocol = 0x40
 
+	// [v6] MTA supports ActSkip.
+	OptSkip OptProtocol = 0x400
+
 	// [v6] milter will not send action response for following MTA messages.
 	OptNoHeaderReply  OptProtocol = 0x80
 	OptNoConnReply    OptProtocol = 0x1000

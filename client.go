@@ -435,6 +435,9 @@ func (s *ClientSession) Header(hdr textproto.Header) (*Action, error) {
 //
 // It is callers responsibility to ensure every chunk is not bigger than
 // MaxBodyChunk.
+//
+// If OptSkip was specified during negotiation, caller should be ready to
+// handle return ActSkip and stop sending body chunks if it is returned.
 func (s *ClientSession) BodyChunk(chunk []byte) (*Action, error) {
 	if s.ProtocolOpts&OptNoBody != 0 {
 		return &Action{Code: ActContinue}, nil
@@ -486,6 +489,9 @@ func (s *ClientSession) BodyReadFrom(r io.Reader) ([]ModifyAction, *Action, erro
 		act, err := s.BodyChunk(buf[:n])
 		if err != nil {
 			return nil, nil, err
+		}
+		if act.Code == ActSkip {
+			break
 		}
 		if act.Code != ActContinue {
 			return nil, act, nil
