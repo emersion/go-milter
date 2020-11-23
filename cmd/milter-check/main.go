@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/emersion/go-message/textproto"
 	"github.com/emersion/go-milter"
@@ -69,6 +70,8 @@ func main() {
 	c := milter.NewClientWithOptions(*transport, *address, milter.ClientOptions{
 		ActionMask:   milter.OptAction(*actionMask),
 		ProtocolMask: milter.OptProtocol(*disabledMsgs),
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
 	})
 	defer c.Close()
 
