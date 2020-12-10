@@ -51,6 +51,43 @@ type Milter interface {
 	Body(m *Modifier) (Response, error)
 }
 
+// NoOpMilter is a dummy Milter implementation that does nothing.
+type NoOpMilter struct{}
+
+var _ Milter = NoOpMilter{}
+
+func (NoOpMilter) Connect(host string, family string, port uint16, addr net.IP, m *Modifier) (Response, error) {
+	return RespContinue, nil
+}
+
+func (NoOpMilter) Helo(name string, m *Modifier) (Response, error) {
+	return RespContinue, nil
+}
+
+func (NoOpMilter) MailFrom(from string, m *Modifier) (Response, error) {
+	return RespContinue, nil
+}
+
+func (NoOpMilter) RcptTo(rcptTo string, m *Modifier) (Response, error) {
+	return RespContinue, nil
+}
+
+func (NoOpMilter) Header(name string, value string, m *Modifier) (Response, error) {
+	return RespContinue, nil
+}
+
+func (NoOpMilter) Headers(h textproto.MIMEHeader, m *Modifier) (Response, error) {
+	return RespContinue, nil
+}
+
+func (NoOpMilter) BodyChunk(chunk []byte, m *Modifier) (Response, error) {
+	return RespContinue, nil
+}
+
+func (NoOpMilter) Body(m *Modifier) (Response, error) {
+	return RespAccept, nil
+}
+
 // Server is a milter server.
 type Server struct {
 	NewMilter func() Milter
