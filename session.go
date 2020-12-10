@@ -112,22 +112,22 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 
 	case CodeConn:
 		// new connection, get hostname
-		Hostname := readCString(msg.Data)
-		msg.Data = msg.Data[len(Hostname)+1:]
+		hostname := readCString(msg.Data)
+		msg.Data = msg.Data[len(hostname)+1:]
 		// get protocol family
 		protocolFamily := msg.Data[0]
 		msg.Data = msg.Data[1:]
 		// get port
-		var Port uint16
+		var port uint16
 		if protocolFamily == '4' || protocolFamily == '6' {
 			if len(msg.Data) < 2 {
 				return RespTempFail, nil
 			}
-			Port = binary.BigEndian.Uint16(msg.Data)
+			port = binary.BigEndian.Uint16(msg.Data)
 			msg.Data = msg.Data[2:]
 		}
 		// get address
-		Address := readCString(msg.Data)
+		address := readCString(msg.Data)
 		// convert address and port to human readable string
 		family := map[byte]string{
 			'U': "unknown",
@@ -137,10 +137,10 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 		}
 		// run handler and return
 		return m.backend.Connect(
-			Hostname,
+			hostname,
 			family[protocolFamily],
-			Port,
-			net.ParseIP(Address),
+			port,
+			net.ParseIP(address),
 			newModifier(m))
 
 	case CodeMacro:
@@ -172,17 +172,17 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 			m.headers = make(textproto.MIMEHeader)
 		}
 		// add new header to headers map
-		HeaderData := decodeCStrings(msg.Data)
-		if len(HeaderData) == 2 {
-			m.headers.Add(HeaderData[0], HeaderData[1])
+		headerData := decodeCStrings(msg.Data)
+		if len(headerData) == 2 {
+			m.headers.Add(headerData[0], headerData[1])
 			// call and return milter handler
-			return m.backend.Header(HeaderData[0], HeaderData[1], newModifier(m))
+			return m.backend.Header(headerData[0], headerData[1], newModifier(m))
 		}
 
 	case CodeMail:
 		// envelope from address
-		envfrom := readCString(msg.Data)
-		return m.backend.MailFrom(strings.Trim(envfrom, "<>"), newModifier(m))
+		from := readCString(msg.Data)
+		return m.backend.MailFrom(strings.Trim(from, "<>"), newModifier(m))
 
 	case CodeEOH:
 		// end of headers
@@ -190,10 +190,10 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 
 	case CodeOptNeg:
 		// ignore request and prepare response buffer
-		buffer := new(bytes.Buffer)
+		var buffer bytes.Buffer
 		// prepare response data
 		for _, value := range []uint32{serverProtocolVersion, uint32(m.actions), uint32(m.protocol)} {
-			if err := binary.Write(buffer, binary.BigEndian, value); err != nil {
+			if err := binary.Write(&buffer, binary.BigEndian, value); err != nil {
 				return nil, err
 			}
 		}
@@ -206,8 +206,8 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 
 	case CodeRcpt:
 		// envelope to address
-		envto := readCString(msg.Data)
-		return m.backend.RcptTo(strings.Trim(envto, "<>"), newModifier(m))
+		to := readCString(msg.Data)
+		return m.backend.RcptTo(strings.Trim(to, "<>"), newModifier(m))
 
 	case CodeData:
 		// data, ignore
