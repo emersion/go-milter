@@ -102,6 +102,7 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 		// abort current message and start over
 		m.headers = nil
 		m.macros = nil
+		m.backend = m.server.NewMilter()
 		// do not send response
 		return nil, nil
 
