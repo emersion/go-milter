@@ -139,19 +139,19 @@ func writePacket(conn net.Conn, msg *Message, timeout time.Duration) error {
 
 // Process processes incoming milter commands
 func (m *milterSession) Process(msg *Message) (Response, error) {
-	switch msg.Code {
-	case 'A':
+	switch Code(msg.Code) {
+	case CodeAbort:
 		// abort current message and start over
 		m.headers = nil
 		m.macros = nil
 		// do not send response
 		return nil, nil
 
-	case 'B':
+	case CodeBody:
 		// body chunk
 		return m.backend.BodyChunk(msg.Data, newModifier(m))
 
-	case 'C':
+	case CodeConn:
 		// new connection, get hostname
 		Hostname := readCString(msg.Data)
 		msg.Data = msg.Data[len(Hostname)+1:]
@@ -184,7 +184,7 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 			net.ParseIP(Address),
 			newModifier(m))
 
-	case 'D':
+	case CodeMacro:
 		// define macros
 		m.macros = make(map[string]string)
 		// convert data to Go strings
@@ -198,16 +198,16 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 		// do not send response
 		return nil, nil
 
-	case 'E':
+	case CodeEOB:
 		// call and return milter handler
 		return m.backend.Body(newModifier(m))
 
-	case 'H':
+	case CodeHelo:
 		// helo command
 		name := strings.TrimSuffix(string(msg.Data), null)
 		return m.backend.Helo(name, newModifier(m))
 
-	case 'L':
+	case CodeHeader:
 		// make sure headers is initialized
 		if m.headers == nil {
 			m.headers = make(textproto.MIMEHeader)
@@ -220,16 +220,16 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 			return m.backend.Header(HeaderData[0], HeaderData[1], newModifier(m))
 		}
 
-	case 'M':
+	case CodeMail:
 		// envelope from address
 		envfrom := readCString(msg.Data)
 		return m.backend.MailFrom(strings.Trim(envfrom, "<>"), newModifier(m))
 
-	case 'N':
+	case CodeEOH:
 		// end of headers
 		return m.backend.Headers(m.headers, newModifier(m))
 
-	case 'O':
+	case CodeOptNeg:
 		// ignore request and prepare response buffer
 		buffer := new(bytes.Buffer)
 		// prepare response data
@@ -241,16 +241,16 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 		// build and send packet
 		return NewResponse('O', buffer.Bytes()), nil
 
-	case 'Q':
+	case CodeQuit:
 		// client requested session close
 		return nil, errCloseSession
 
-	case 'R':
+	case CodeRcpt:
 		// envelope to address
 		envto := readCString(msg.Data)
 		return m.backend.RcptTo(strings.Trim(envto, "<>"), newModifier(m))
 
-	case 'T':
+	case CodeData:
 		// data, ignore
 
 	default:

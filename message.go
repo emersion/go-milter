@@ -52,6 +52,7 @@ const (
 	CodeBody   Code = 'B' // SMFIC_BODY
 	CodeEOB    Code = 'E' // SMFIC_BODYEOB
 	CodeAbort  Code = 'A' // SMFIC_ABORT
+	CodeData   Code = 'T' // SMFIC_DATA
 )
 
 const MaxBodyChunk = 65535
