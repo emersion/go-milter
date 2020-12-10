@@ -1,42 +1,45 @@
 // Package milter provides an interface to implement milter mail filters
 package milter
 
-import (
-	"net"
-	"net/textproto"
+// OptAction sets which actions the milter wants to perform.
+// Multiple options can be set using a bitmask.
+type OptAction uint32
+
+// set which actions the milter wants to perform
+const (
+	OptAddHeader    OptAction = 0x01
+	OptChangeBody   OptAction = 0x02
+	OptAddRcpt      OptAction = 0x04
+	OptRemoveRcpt   OptAction = 0x08
+	OptChangeHeader OptAction = 0x10
+	OptQuarantine   OptAction = 0x20
+	OptChangeFrom   OptAction = 0x40
 )
 
-// Milter is an interface for milter callback handlers.
-type Milter interface {
-	// Connect is called to provide SMTP connection data for incoming message.
-	// Suppress with OptNoConnect.
-	Connect(host string, family string, port uint16, addr net.IP, m *Modifier) (Response, error)
+// OptProtocol masks out unwanted parts of the SMTP transaction.
+// Multiple options can be set using a bitmask.
+type OptProtocol uint32
 
-	// Helo is called to process any HELO/EHLO related filters. Suppress with
-	// OptNoHelo.
-	Helo(name string, m *Modifier) (Response, error)
+const (
+	OptNoConnect  OptProtocol = 0x01
+	OptNoHelo     OptProtocol = 0x02
+	OptNoMailFrom OptProtocol = 0x04
+	OptNoRcptTo   OptProtocol = 0x08
+	OptNoBody     OptProtocol = 0x10
+	OptNoHeaders  OptProtocol = 0x20
+	OptNoEOH      OptProtocol = 0x40
 
-	// MailFrom is called to process filters on envelope FROM address. Suppress
-	// with OptNoMailFrom.
-	MailFrom(from string, m *Modifier) (Response, error)
+	// [v6] MTA supports ActSkip.
+	OptSkip OptProtocol = 0x400
 
-	// RcptTo is called to process filters on envelope TO address. Suppress with
-	// OptNoRcptTo.
-	RcptTo(rcptTo string, m *Modifier) (Response, error)
-
-	// Header is called once for each header in incoming message. Suppress with
-	// OptNoHeaders.
-	Header(name string, value string, m *Modifier) (Response, error)
-
-	// Headers is called when all message headers have been processed. Suppress
-	// with OptNoEOH.
-	Headers(h textproto.MIMEHeader, m *Modifier) (Response, error)
-
-	// BodyChunk is called to process next message body chunk data (up to 64KB
-	// in size). Suppress with OptNoBody.
-	BodyChunk(chunk []byte, m *Modifier) (Response, error)
-
-	// Body is called at the end of each message. All changes to message's
-	// content & attributes must be done here.
-	Body(m *Modifier) (Response, error)
-}
+	// [v6] milter will not send action response for following MTA messages.
+	OptNoHeaderReply  OptProtocol = 0x80
+	OptNoConnReply    OptProtocol = 0x1000
+	OptNoHeloReply    OptProtocol = 0x2000
+	OptNoMailReply    OptProtocol = 0x4000
+	OptNoRcptReply    OptProtocol = 0x8000
+	OptNoDataReply    OptProtocol = 0x10000
+	OptNoUnknownReply OptProtocol = 0x20000
+	OptNoEOHReply     OptProtocol = 0x40000
+	OptNoBodyReply    OptProtocol = 0x80000
+)
