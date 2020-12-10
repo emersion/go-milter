@@ -17,6 +17,7 @@ var errCloseSession = errors.New("Stop current milter processing")
 
 // milterSession keeps session state during MTA communication
 type milterSession struct {
+	server   *Server
 	actions  OptAction
 	protocol OptProtocol
 	conn     net.Conn
@@ -251,9 +252,9 @@ func (m *milterSession) HandleMilterCommands() {
 			}
 
 			if !resp.Continue() {
-				return
+				// prepare backend for next message
+				m.backend = m.server.NewMilter()
 			}
-
 		}
 	}
 }

@@ -77,6 +77,7 @@ func (s *Server) Serve(ln net.Listener) error {
 		}
 
 		session := milterSession{
+			server:   s,
 			actions:  s.Actions,
 			protocol: s.Protocol,
 			conn:     conn,
