@@ -10,6 +10,11 @@ import (
 	"github.com/emersion/go-message/textproto"
 )
 
+func init() {
+	// HACK: claim to support v6 in server for tests
+	serverProtocolVersion = 6
+}
+
 type MockMilter struct {
 	ConnResp Response
 	ConnMod  func(m *Modifier)

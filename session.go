@@ -233,7 +233,7 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 		// ignore request and prepare response buffer
 		buffer := new(bytes.Buffer)
 		// prepare response data
-		for _, value := range []uint32{protocolVersion, uint32(m.actions), uint32(m.protocol)} {
+		for _, value := range []uint32{serverProtocolVersion, uint32(m.actions), uint32(m.protocol)} {
 			if err := binary.Write(buffer, binary.BigEndian, value); err != nil {
 				return nil, err
 			}
@@ -265,11 +265,9 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 
 // HandleMilterComands processes all milter commands in the same connection
 func (m *milterSession) HandleMilterCommands() {
-	// close session socket on exit
 	defer m.conn.Close()
 
 	for {
-		// ReadPacket
 		msg, err := m.ReadPacket()
 		if err != nil {
 			if err != io.EOF {
@@ -278,7 +276,6 @@ func (m *milterSession) HandleMilterCommands() {
 			return
 		}
 
-		// process command
 		resp, err := m.Process(msg)
 		if err != nil {
 			if err != errCloseSession {

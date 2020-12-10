@@ -5,6 +5,12 @@ import (
 	"net"
 )
 
+// Milter protocol version implemented by the server.
+//
+// Note: Not exported as we might want to support multiple versions
+// transparently in the future.
+var serverProtocolVersion uint32 = 2
+
 // ErrServerClosed is returned by the Server's Serve method after a call to
 // Close.
 var ErrServerClosed = errors.New("milter: server closed")

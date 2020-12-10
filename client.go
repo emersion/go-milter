@@ -12,6 +12,12 @@ import (
 	"github.com/emersion/go-message/textproto"
 )
 
+// Milter protocol version implemented by the client.
+//
+// Note: Not exported as we might want to support multiple versions
+// transparently in the future.
+const clientProtocolVersion uint32 = 6
+
 // Client is a wrapper for managing milter connections.
 //
 // Currently it just creates new connections using provided Dialer.
@@ -118,7 +124,7 @@ func (s *ClientSession) negotiate(actionMask OptAction, protoMask OptProtocol) e
 		Code: byte(CodeOptNeg), // TODO(foxcpp): Get rid of casts by changing msg.Code to have Code type
 		Data: make([]byte, 4*3),
 	}
-	binary.BigEndian.PutUint32(msg.Data, protocolVersion)
+	binary.BigEndian.PutUint32(msg.Data, clientProtocolVersion)
 	binary.BigEndian.PutUint32(msg.Data[4:], uint32(actionMask))
 	binary.BigEndian.PutUint32(msg.Data[8:], uint32(protoMask))
 
@@ -139,7 +145,7 @@ func (s *ClientSession) negotiate(actionMask OptAction, protoMask OptProtocol) e
 
 	// Not a strict comparison since we might be able to work correctly with
 	// milter using a newer protocol as long as masks negotiated are meaningful.
-	if milterVersion < protocolVersion {
+	if milterVersion < clientProtocolVersion {
 		return fmt.Errorf("milter: negotiate: unsupported protocol version: %v", milterVersion)
 	}
 
