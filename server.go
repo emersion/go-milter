@@ -98,6 +98,16 @@ type Server struct {
 	closed    bool
 }
 
+// NewDefaultServer create default militer server.
+func NewDefaultServer(milter func() Milter) *Server{
+
+	return &Server{
+		NewMilter: milter,
+		Actions: OptAddHeader|OptChangeBody|OptAddRcpt|
+			OptRemoveRcpt|OptChangeHeader|OptQuarantine,
+	}
+}
+
 // Serve starts the server.
 func (s *Server) Serve(ln net.Listener) error {
 	defer ln.Close()
