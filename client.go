@@ -32,11 +32,12 @@ type Dialer interface {
 }
 
 type ClientOptions struct {
-	Dialer       Dialer
-	ReadTimeout  time.Duration
-	WriteTimeout time.Duration
-	ActionMask   OptAction
-	ProtocolMask OptProtocol
+	Dialer       	Dialer
+	ReadTimeout  	time.Duration
+	WriteTimeout 	time.Duration
+	ActionMask   	OptAction
+	ProtocolMask 	OptProtocol
+	ProtocolVersion uint32
 }
 
 var defaultOptions = ClientOptions{
@@ -47,6 +48,7 @@ var defaultOptions = ClientOptions{
 	WriteTimeout: 10 * time.Second,
 	ActionMask:   OptAddHeader | OptAddRcpt | OptChangeBody | OptChangeFrom | OptChangeHeader,
 	ProtocolMask: 0,
+	ProtocolVersion: clientProtocolVersion,
 }
 
 // NewDefaultClient creates a new Client object using default options.
@@ -66,6 +68,10 @@ func NewDefaultClient(network, address string) *Client {
 func NewClientWithOptions(network, address string, opts ClientOptions) *Client {
 	if opts.Dialer == nil {
 		opts.Dialer = &net.Dialer{}
+	}
+
+	if opts.ProtocolVersion == 0 {
+		opts.ProtocolVersion = clientProtocolVersion
 	}
 
 	return &Client{
@@ -89,7 +95,7 @@ func (c *Client) Session() (*ClientSession, error) {
 	}
 
 	s.conn = conn
-	if err := s.negotiate(c.opts.ActionMask, c.opts.ProtocolMask); err != nil {
+	if err := s.negotiate(c.opts.ActionMask, c.opts.ProtocolMask, c.opts.ProtocolVersion); err != nil {
 		return nil, err
 	}
 
@@ -118,13 +124,13 @@ type ClientSession struct {
 
 // negotiate exchanges OPTNEG messages with the milter and sets s.mask to the
 // negotiated value.
-func (s *ClientSession) negotiate(actionMask OptAction, protoMask OptProtocol) error {
+func (s *ClientSession) negotiate(actionMask OptAction, protoMask OptProtocol, protocolVersion uint32) error {
 	// Send our mask, get mask from milter..
 	msg := &Message{
 		Code: byte(CodeOptNeg), // TODO(foxcpp): Get rid of casts by changing msg.Code to have Code type
 		Data: make([]byte, 4*3),
 	}
-	binary.BigEndian.PutUint32(msg.Data, clientProtocolVersion)
+	binary.BigEndian.PutUint32(msg.Data, protocolVersion)
 	binary.BigEndian.PutUint32(msg.Data[4:], uint32(actionMask))
 	binary.BigEndian.PutUint32(msg.Data[8:], uint32(protoMask))
 
@@ -145,7 +151,7 @@ func (s *ClientSession) negotiate(actionMask OptAction, protoMask OptProtocol) e
 
 	// Not a strict comparison since we might be able to work correctly with
 	// milter using a newer protocol as long as masks negotiated are meaningful.
-	if milterVersion < clientProtocolVersion {
+	if milterVersion < protocolVersion {
 		return fmt.Errorf("milter: negotiate: unsupported protocol version: %v", milterVersion)
 	}
 
