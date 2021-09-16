@@ -16,7 +16,9 @@ import (
 //
 // Note: Not exported as we might want to support multiple versions
 // transparently in the future.
-const clientProtocolVersion uint32 = 6
+
+// [sjs] - changed protocol version to 2 to work with the server
+const clientProtocolVersion uint32 = 2
 
 // Client is a wrapper for managing milter connections.
 //
