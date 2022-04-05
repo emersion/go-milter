@@ -177,6 +177,10 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 		}
 		// add new header to headers map
 		headerData := decodeCStrings(msg.Data)
+		// headers with an empty body appear as `text\x00\x00`, decodeCStrings will drop the empty body
+		if len(headerData) == 1 {
+			headerData = append(headerData, "")
+		}
 		if len(headerData) == 2 {
 			m.headers.Add(headerData[0], headerData[1])
 			// call and return milter handler
