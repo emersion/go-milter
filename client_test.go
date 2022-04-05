@@ -218,15 +218,19 @@ func TestMilterClient_UsualFlow(t *testing.T) {
 	hdr := textproto.Header{}
 	hdr.Add("From", "from@example.org")
 	hdr.Add("To", "to@example.org")
+	hdr.Add("x-empty-header", "")
 	act, err = session.Header(hdr)
 	assertAction(act, err, ActContinue)
-	if len(mm.Hdr) != 2 {
+	if len(mm.Hdr) != 3 {
 		t.Fatal("Unexpected header length:", len(mm.Hdr))
 	}
 	if val := mm.Hdr.Get("From"); val != "from@example.org" {
 		t.Fatal("Wrong From header:", val)
 	}
 	if val := mm.Hdr.Get("To"); val != "to@example.org" {
+		t.Fatal("Wrong To header:", val)
+	}
+	if val := mm.Hdr.Get("x-empty-header"); val != "" {
 		t.Fatal("Wrong To header:", val)
 	}
 
