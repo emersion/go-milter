@@ -49,6 +49,11 @@ type Milter interface {
 	// Body is called at the end of each message. All changes to message's
 	// content & attributes must be done here.
 	Body(m *Modifier) (Response, error)
+
+	// Abort is called is the current message has been aborted. All message data
+	// should be reset to prior to the Helo callback. Connection data should be
+	// preserved.
+	Abort(m *Modifier) error
 }
 
 // NoOpMilter is a dummy Milter implementation that does nothing.
@@ -86,6 +91,10 @@ func (NoOpMilter) BodyChunk(chunk []byte, m *Modifier) (Response, error) {
 
 func (NoOpMilter) Body(m *Modifier) (Response, error) {
 	return RespAccept, nil
+}
+
+func (NoOpMilter) Abort(m *Modifier) error {
+	return nil
 }
 
 // Server is a milter server.
