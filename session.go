@@ -100,11 +100,11 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 	switch Code(msg.Code) {
 	case CodeAbort:
 		// abort current message and start over
-		m.headers = nil
-		m.macros = nil
-		m.backend = m.server.NewMilter()
-		// do not send response
-		return nil, nil
+		defer func() {
+			m.headers = nil
+			m.macros = nil
+		}()
+		return nil, m.backend.Abort(newModifier(m))
 
 	case CodeBody:
 		// body chunk

@@ -634,14 +634,22 @@ func (s *ClientSession) End() ([]ModifyAction, *Action, error) {
 	return modifyActs, act, nil
 }
 
+// Abort sends Abort to the milter.
+//
+// This is called for an unexpected end to an email outside the milters
+// control.
+func (s *ClientSession) Abort() error {
+	return writePacket(s.conn, &Message{
+		Code: byte(CodeAbort),
+	}, s.writeTimeout)
+}
+
 // Close releases resources associated with the session.
 //
 // If there a milter sequence in progress - it is aborted.
 func (s *ClientSession) Close() error {
 	if s.needAbort {
-		writePacket(s.conn, &Message{
-			Code: byte(CodeAbort),
-		}, s.writeTimeout)
+		_ = s.Abort()
 	}
 
 	if err := writePacket(s.conn, &Message{

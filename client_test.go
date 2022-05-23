@@ -48,6 +48,9 @@ type MockMilter struct {
 	BodyMod  func(m *Modifier)
 	BodyErr  error
 
+	AbortMod func(m *Modifier)
+	AbortErr error
+
 	// Info collected during calls.
 	Host   string
 	Family string
@@ -125,6 +128,13 @@ func (mm *MockMilter) Body(m *Modifier) (Response, error) {
 		mm.BodyMod(m)
 	}
 	return mm.BodyResp, mm.BodyErr
+}
+
+func (mm *MockMilter) Abort(m *Modifier) error {
+	if mm.AbortMod != nil {
+		mm.AbortMod(m)
+	}
+	return mm.AbortErr
 }
 
 func TestMilterClient_UsualFlow(t *testing.T) {
@@ -267,5 +277,98 @@ func TestMilterClient_UsualFlow(t *testing.T) {
 
 	if !reflect.DeepEqual(modifyActs, expected) {
 		t.Fatalf("Wrong modify actions, got %+v", modifyActs)
+	}
+}
+
+func TestMilterClient_AbortFlow(t *testing.T) {
+	macros := make(map[string]string)
+	mm := MockMilter{
+		ConnResp: RespContinue,
+		HeloResp: RespContinue,
+		HeloMod: func(m *Modifier) {
+			macros = m.Macros
+		},
+		AbortMod: func(m *Modifier) {
+			macros = m.Macros
+		},
+	}
+	s := Server{
+		NewMilter: func() Milter {
+			return &mm
+		},
+		Actions: OptAddHeader | OptChangeHeader,
+	}
+	defer s.Close()
+	local, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	go s.Serve(local)
+
+	cl := NewClientWithOptions("tcp", local.Addr().String(), ClientOptions{
+		ActionMask: OptAddHeader | OptChangeHeader | OptQuarantine,
+	})
+	defer cl.Close()
+	session, err := cl.Session()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+
+	assertAction := func(act *Action, err error, expectCode ActionCode) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if act.Code != expectCode {
+			t.Fatal("Unexpectedcode:", act.Code)
+		}
+	}
+
+	act, err := session.Conn("host", FamilyInet, 25565, "172.0.0.1")
+	assertAction(act, err, ActContinue)
+	if mm.Host != "host" {
+		t.Fatal("Wrong host:", mm.Host)
+	}
+	if mm.Family != "tcp4" {
+		t.Fatal("Wrong family:", mm.Family)
+	}
+	if mm.Port != 25565 {
+		t.Fatal("Wrong port:", mm.Port)
+	}
+	if mm.Addr.String() != "172.0.0.1" {
+		t.Fatal("Wrong IP:", mm.Addr)
+	}
+
+	if err := session.Macros(CodeHelo, "tls_version", "very old"); err != nil {
+		t.Fatal("Unexpected error", err)
+	}
+
+	act, err = session.Helo("helo_host")
+	assertAction(act, err, ActContinue)
+	if mm.HeloValue != "helo_host" {
+		t.Fatal("Wrong helo value:", mm.HeloValue)
+	}
+	if v, ok := macros["tls_version"]; !ok || v != "very old" {
+		t.Fatal("Wrong tls_version macro value:", v)
+	}
+
+	err = session.Abort()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Validate macro values are preserved for the abort callback
+	if v, ok := macros["tls_version"]; !ok || v != "very old" {
+		t.Fatal("Wrong tls_version macro value: ", v)
+	}
+
+	act, err = session.Helo("repeated_helo_host")
+	assertAction(act, err, ActContinue)
+	if mm.HeloValue != "repeated_helo_host" {
+		t.Fatal("Wrong helo value:", mm.HeloValue)
+	}
+	if len(macros["tls_version"]) != 0 {
+		t.Fatal("Unexpected macro data:", macros)
 	}
 }
