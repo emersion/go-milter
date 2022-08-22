@@ -646,7 +646,7 @@ func (s *ClientSession) Abort() error {
 
 // Close releases resources associated with the session.
 //
-// If there a milter sequence in progress - it is aborted.
+// If there's a milter sequence in progress - it is aborted.
 func (s *ClientSession) Close() error {
 	if s.needAbort {
 		_ = s.Abort()

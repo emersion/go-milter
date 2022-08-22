@@ -51,6 +51,10 @@ type MockMilter struct {
 	AbortMod func(m *Modifier)
 	AbortErr error
 
+	CloseResp Response
+	CloseMod  func(m *Modifier)
+	CloseErr  error
+
 	// Info collected during calls.
 	Host   string
 	Family string
@@ -137,6 +141,13 @@ func (mm *MockMilter) Abort(m *Modifier) error {
 	return mm.AbortErr
 }
 
+func (mm *MockMilter) Close(m *Modifier) (Response, error) {
+	if mm.CloseMod != nil {
+		mm.CloseMod(m)
+	}
+	return mm.CloseResp, mm.CloseErr
+}
+
 func TestMilterClient_UsualFlow(t *testing.T) {
 	mm := MockMilter{
 		ConnResp:      RespContinue,
@@ -152,6 +163,7 @@ func TestMilterClient_UsualFlow(t *testing.T) {
 			m.ChangeHeader(1, "Subject", "***SPAM***")
 			m.Quarantine("very bad message")
 		},
+		CloseResp: RespContinue,
 	}
 	s := Server{
 		NewMilter: func() Milter {
