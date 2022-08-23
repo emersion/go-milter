@@ -73,7 +73,7 @@ type Milter interface {
 	// 	  a per-connection basis.
 	// 	- Since the connection is already closing, the return value is
 	// 	  currently ignored.
-	Close(m *Modifier) (Response, error)
+	Close(m *Modifier)
 }
 
 // NoOpMilter is a dummy Milter implementation that does nothing.
@@ -117,8 +117,8 @@ func (NoOpMilter) Abort(m *Modifier) error {
 	return nil
 }
 
-func (NoOpMilter) Close(m *Modifier) (Response, error) {
-	return RespContinue, nil
+func (NoOpMilter) Close(m *Modifier) {
+	return
 }
 
 // Server is a milter server.
