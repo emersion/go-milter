@@ -12,15 +12,13 @@ import (
 	"github.com/emersion/go-message/textproto"
 )
 
-// Milter protocol version implemented by the client.
-//
-// Note: Not exported as we might want to support multiple versions
-// transparently in the future.
-const clientProtocolVersion uint32 = 6
+// Milter protocol max version. Can be downgraded during negotiation.
+var clientProtocolVersion uint32 = 6
+var ErrUnsupportedMilterVersion = fmt.Errorf("milter: negotiate: unsupported milter version")
 
 // Client is a wrapper for managing milter connections.
 //
-// Currently it just creates new connections using provided Dialer.
+// Currently, it just creates new connections using provided Dialer.
 type Client struct {
 	opts    ClientOptions
 	network string
@@ -141,18 +139,22 @@ func (s *ClientSession) negotiate(actionMask OptAction, protoMask OptProtocol) e
 	if len(msg.Data) < 4*3 /* version + action mask + proto mask */ {
 		return fmt.Errorf("milter: negotiate: unexpected data size: %v", len(msg.Data))
 	}
+
 	milterVersion := binary.BigEndian.Uint32(msg.Data[:4])
-
-	// Not a strict comparison since we might be able to work correctly with
-	// milter using a newer protocol as long as masks negotiated are meaningful.
-	if milterVersion < clientProtocolVersion {
-		return fmt.Errorf("milter: negotiate: unsupported protocol version: %v", milterVersion)
-	}
-
 	milterActionMask := binary.BigEndian.Uint32(msg.Data[4:])
 	s.ActionOpts = OptAction(milterActionMask)
 	milterProtoMask := binary.BigEndian.Uint32(msg.Data[8:])
 	s.ProtocolOpts = OptProtocol(milterProtoMask)
+
+	// If milter advertises lower protocol version than we support, try to downgrade.
+	if milterVersion < clientProtocolVersion {
+		// Only downgrade if both sides support the same actions and protocols.
+		if actionMask&0x3f == actionMask && protoMask&0x7f == protoMask {
+			clientProtocolVersion = 2
+		} else {
+			return ErrUnsupportedMilterVersion
+		}
+	}
 
 	s.needAbort = true
 

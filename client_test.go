@@ -10,11 +10,6 @@ import (
 	"github.com/emersion/go-message/textproto"
 )
 
-func init() {
-	// HACK: claim to support v6 in server for tests
-	serverProtocolVersion = 6
-}
-
 type MockMilter struct {
 	ConnResp Response
 	ConnMod  func(m *Modifier)
@@ -370,5 +365,48 @@ func TestMilterClient_AbortFlow(t *testing.T) {
 	}
 	if len(macros["tls_version"]) != 0 {
 		t.Fatal("Unexpected macro data:", macros)
+	}
+}
+
+// TestMilterClient_ImpossibleClientDowngrade tests that the client does not downgrade to v2
+// in case of a v6 bit set in the ActionMask.
+func TestMilterClient_ImpossibleClientDowngrade(t *testing.T) {
+	mm := MockMilter{
+		ConnResp:      RespContinue,
+		HeloResp:      RespContinue,
+		MailResp:      RespContinue,
+		RcptResp:      RespContinue,
+		HdrResp:       RespContinue,
+		HdrsResp:      RespContinue,
+		BodyChunkResp: RespContinue,
+		BodyResp:      RespContinue,
+		BodyMod: func(m *Modifier) {
+			m.AddHeader("X-Bad", "very")
+			m.ChangeHeader(1, "Subject", "***SPAM***")
+			m.Quarantine("very bad message")
+		},
+	}
+	s := Server{
+		NewMilter: func() Milter {
+			return &mm
+		},
+		Actions: OptAddHeader | OptChangeHeader,
+	}
+	defer s.Close()
+	local, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	go s.Serve(local)
+
+	cl := NewClientWithOptions("tcp", local.Addr().String(), ClientOptions{
+		// OptChangeFrom is only supported by a server with v6, but this server only supports v2.
+		// This should provoke a downgrade error.
+		ActionMask: OptAddHeader | OptChangeFrom,
+	})
+	defer cl.Close()
+	_, err = cl.Session()
+	if err != ErrUnsupportedMilterVersion {
+		t.Fatalf("Expected ErrUnsupportedMilterVersion, got %v", err)
 	}
 }
