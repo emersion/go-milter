@@ -12,8 +12,6 @@ import (
 	"github.com/emersion/go-message/textproto"
 )
 
-// Milter protocol max version. Can be downgraded during negotiation.
-var clientProtocolVersion uint32 = 6
 var ErrUnsupportedMilterVersion = fmt.Errorf("milter: negotiate: unsupported milter version")
 
 // Client is a wrapper for managing milter connections.
@@ -75,8 +73,9 @@ func NewClientWithOptions(network, address string, opts ClientOptions) *Client {
 
 func (c *Client) Session() (*ClientSession, error) {
 	s := &ClientSession{
-		readTimeout:  c.opts.ReadTimeout,
-		writeTimeout: c.opts.WriteTimeout,
+		readTimeout:           c.opts.ReadTimeout,
+		writeTimeout:          c.opts.WriteTimeout,
+		clientProtocolVersion: 6,
 	}
 
 	// TODO(foxcpp): Connection pooling.
@@ -112,6 +111,8 @@ type ClientSession struct {
 
 	readTimeout  time.Duration
 	writeTimeout time.Duration
+	// Milter client version. Can be downgraded during negotiation
+	clientProtocolVersion uint32
 }
 
 // negotiate exchanges OPTNEG messages with the milter and sets s.mask to the
@@ -122,7 +123,7 @@ func (s *ClientSession) negotiate(actionMask OptAction, protoMask OptProtocol) e
 		Code: byte(CodeOptNeg), // TODO(foxcpp): Get rid of casts by changing msg.Code to have Code type
 		Data: make([]byte, 4*3),
 	}
-	binary.BigEndian.PutUint32(msg.Data, clientProtocolVersion)
+	binary.BigEndian.PutUint32(msg.Data, s.clientProtocolVersion)
 	binary.BigEndian.PutUint32(msg.Data[4:], uint32(actionMask))
 	binary.BigEndian.PutUint32(msg.Data[8:], uint32(protoMask))
 
@@ -147,10 +148,10 @@ func (s *ClientSession) negotiate(actionMask OptAction, protoMask OptProtocol) e
 	s.ProtocolOpts = OptProtocol(milterProtoMask)
 
 	// If milter advertises lower protocol version than we support, try to downgrade.
-	if milterVersion < clientProtocolVersion {
+	if milterVersion < s.clientProtocolVersion {
 		// Only downgrade if both sides support the same actions and protocols.
 		if actionMask&0x3f == actionMask && protoMask&0x7f == protoMask {
-			clientProtocolVersion = 2
+			s.clientProtocolVersion = 2
 		} else {
 			return ErrUnsupportedMilterVersion
 		}
