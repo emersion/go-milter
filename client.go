@@ -150,8 +150,9 @@ func (s *ClientSession) negotiate(actionMask OptAction, protoMask OptProtocol) e
 	// If milter advertises lower protocol version than we support, try to downgrade.
 	if milterVersion < s.clientProtocolVersion {
 		// Only downgrade if both sides support the same actions and protocols.
-		if actionMask&0x3f == actionMask && protoMask&0x7f == protoMask {
-			s.clientProtocolVersion = 2
+		// The lowest supported milterVersion is 2.
+		if milterVersion >= 2 && actionMask&0x3f == actionMask && protoMask&0x7f == protoMask {
+			s.clientProtocolVersion = milterVersion
 		} else {
 			return ErrUnsupportedMilterVersion
 		}
