@@ -210,8 +210,8 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 
 	case CodeQuit:
 		// client requested session close
+		m.backend.Close(newModifier(m))
 		return nil, errCloseSession
-
 	case CodeRcpt:
 		// envelope to address
 		to := readCString(msg.Data)

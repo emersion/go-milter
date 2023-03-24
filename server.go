@@ -54,6 +54,26 @@ type Milter interface {
 	// should be reset to prior to the Helo callback. Connection data should be
 	// preserved.
 	Abort(m *Modifier) error
+
+	// Close is called once at the end of each connection.
+	//
+	// 	- Close may be called "out-of-order", i.e. before even the
+	//	  Connect is called. After a connection is established by the
+	//	  MTA to the filter, if the MTA decides this connection's
+	//	  traffic will be discarded, no data will be passed to the
+	//	  filter from the MTA until the client closes down. At that time,
+	//	  Close is called. It can therefore be the only callback ever
+	//	  used for a given connection, and developers should anticipate
+	//	  this possibility when crafting their Close code. In particular,
+	//	  it is incorrect to assume the private context pointer will be
+	//	  something other than NULL in this callback.
+	// 	- Close is called on close even if the previous mail
+	//	  transaction was aborted.
+	// 	- Close is responsible for freeing any resources allocated on
+	// 	  a per-connection basis.
+	// 	- Since the connection is already closing, the return value is
+	// 	  currently ignored.
+	Close(m *Modifier)
 }
 
 // NoOpMilter is a dummy Milter implementation that does nothing.
@@ -95,6 +115,10 @@ func (NoOpMilter) Body(m *Modifier) (Response, error) {
 
 func (NoOpMilter) Abort(m *Modifier) error {
 	return nil
+}
+
+func (NoOpMilter) Close(m *Modifier) {
+	return
 }
 
 // Server is a milter server.

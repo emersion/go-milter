@@ -132,6 +132,10 @@ func (mm *MockMilter) Abort(m *Modifier) error {
 	return mm.AbortErr
 }
 
+func (mm *MockMilter) Close(m *Modifier) {
+	return
+}
+
 func TestMilterClient_UsualFlow(t *testing.T) {
 	mm := MockMilter{
 		ConnResp:      RespContinue,
