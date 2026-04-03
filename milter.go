@@ -55,3 +55,15 @@ const (
 	// [v6]
 	OptHeaderLeadingSpace OptProtocol = 1 << 20 // SMFIP_HDR_LEADSPC
 )
+
+type Stage uint32
+
+const (
+	StageConnect  Stage = 0 // SMFIM_CONNECT (connect)
+	StageHelo     Stage = 1 // SMFIM_HELO    (HELO/EHLO)
+	StageMailFrom Stage = 2 // SMFIM_ENVFROM (MAIL From)
+	StageRcptTo   Stage = 3 // SMFIM_ENVRCPT (RCPT To)
+	StageData     Stage = 4 // SMFIM_DATA    (DATA)
+	StageEOM      Stage = 5 // SMFIM_EOM     (end of message (final dot))
+	StageEOH      Stage = 6 // SMFIM_EOH     (end of header)
+)
