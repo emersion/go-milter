@@ -104,10 +104,9 @@ type Server struct {
 	Protocol  OptProtocol
 
 	// SymList is the list of macros that the milter wants to receive from
-	// the MTA for the selected protocol stages. For each stage, one can
-	// specify a list separated by space, e.g.: "{rcpt_mailer} {rcpt_host}"
+	// the MTA for the selected protocol stages.
 	// [Server.Actions] must have the flag [OptSetSymList] set.
-	SymList map[Stage]string
+	SymList map[Stage][]string
 
 	listeners []net.Listener
 	closed    bool
