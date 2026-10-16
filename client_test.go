@@ -410,3 +410,69 @@ func TestMilterClient_ImpossibleClientDowngrade(t *testing.T) {
 		t.Fatalf("Expected ErrUnsupportedMilterVersion, got %v", err)
 	}
 }
+
+// TestMilterClient_HeadersPerMessage tests that the headers passed to
+// Milter.Headers are those of the current message only, when one connection
+// carries several messages.
+func TestMilterClient_HeadersPerMessage(t *testing.T) {
+	mm := MockMilter{
+		ConnResp:      RespContinue,
+		HeloResp:      RespContinue,
+		MailResp:      RespContinue,
+		RcptResp:      RespContinue,
+		HdrResp:       RespContinue,
+		HdrsResp:      RespContinue,
+		BodyChunkResp: RespContinue,
+		BodyResp:      RespAccept,
+	}
+	s := Server{
+		NewMilter: func() Milter {
+			return &mm
+		},
+	}
+	defer s.Close()
+	local, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	go s.Serve(local)
+
+	cl := NewClientWithOptions("tcp", local.Addr().String(), ClientOptions{})
+	defer cl.Close()
+	session, err := cl.Session()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+
+	assertAction := func(act *Action, err error, expectCode ActionCode) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if act.Code != expectCode {
+			t.Fatal("Unexpected code:", act.Code)
+		}
+	}
+
+	act, err := session.Conn("host", FamilyInet, 25565, "172.0.0.1")
+	assertAction(act, err, ActContinue)
+	act, err = session.Helo("helo_host")
+	assertAction(act, err, ActContinue)
+
+	for _, from := range []string{"first@example.org", "second@example.org"} {
+		act, err = session.Mail("<"+from+">", nil)
+		assertAction(act, err, ActContinue)
+		act, err = session.Rcpt("<rcpt@example.org>", nil)
+		assertAction(act, err, ActContinue)
+		act, err = session.HeaderField("From", from)
+		assertAction(act, err, ActContinue)
+		act, err = session.HeaderEnd()
+		assertAction(act, err, ActContinue)
+		if got := mm.Hdr.Values("From"); !reflect.DeepEqual(got, []string{from}) {
+			t.Fatalf("Headers got From %q, want only %q", got, from)
+		}
+		_, act, err = session.End()
+		assertAction(act, err, ActAccept)
+	}
+}
