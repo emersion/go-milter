@@ -205,6 +205,9 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 		}
 
 	case CodeMail:
+		// a new message starts: forget the headers of the previous one on
+		// this connection
+		m.headers = nil
 		// envelope from address
 		from := readCString(msg.Data)
 		return m.backend.MailFrom(strings.Trim(from, "<>"), newModifier(m))
