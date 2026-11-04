@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"net/textproto"
+	"runtime/debug"
 	"strings"
 	"time"
 )
@@ -261,7 +262,13 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 
 // HandleMilterComands processes all milter commands in the same connection
 func (m *milterSession) HandleMilterCommands() {
-	defer m.conn.Close()
+	defer func() {
+		if v := recover(); v != nil {
+			log.Printf("panic handling command: %v\n%s", v, debug.Stack())
+		}
+
+		m.conn.Close()
+	}()
 
 	for {
 		msg, err := m.ReadPacket()
