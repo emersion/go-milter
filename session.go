@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -14,6 +15,9 @@ import (
 )
 
 var errCloseSession = errors.New("Stop current milter processing")
+
+// maxPacketSize limits the command byte and payload before allocation.
+const maxPacketSize = 1 << 20
 
 // milterSession keeps session state during MTA communication
 type milterSession struct {
@@ -41,6 +45,12 @@ func readPacket(conn net.Conn, timeout time.Duration) (*Message, error) {
 	var length uint32
 	if err := binary.Read(conn, binary.BigEndian, &length); err != nil {
 		return nil, err
+	}
+	if length == 0 {
+		return nil, errors.New("milter: invalid zero-length packet")
+	}
+	if length > maxPacketSize {
+		return nil, fmt.Errorf("milter: packet length %d exceeds %d bytes", length, maxPacketSize)
 	}
 
 	// read packet data
@@ -113,6 +123,9 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 	case CodeConn:
 		// new connection, get hostname
 		hostname := readCString(msg.Data)
+		if len(msg.Data) < len(hostname)+2 {
+			return nil, errors.New("milter: malformed connect command")
+		}
 		msg.Data = msg.Data[len(hostname)+1:]
 		// get protocol family
 		protocolFamily := msg.Data[0]
@@ -144,6 +157,9 @@ func (m *milterSession) Process(msg *Message) (Response, error) {
 			newModifier(m))
 
 	case CodeMacro:
+		if len(msg.Data) == 0 {
+			return nil, errors.New("milter: malformed macro command")
+		}
 		// define macros
 		m.macros = make(map[string]string)
 		// convert data to Go strings
